@@ -1,0 +1,27 @@
+// /admin/dashboard — 관리자 대시보드 (서버 인증 가드 + 클라이언트 테이블)
+import { redirect } from "next/navigation";
+import { isAdminAuthenticated } from "@/lib/admin-auth";
+import { AdminTable } from "@/components/AdminTable";
+import { LogoutButton } from "@/components/admin/LogoutButton";
+
+// 캐시 없이 매 요청 인증 확인
+export const dynamic = "force-dynamic";
+
+export default function DashboardPage() {
+  // 미인증 시 로그인 페이지로
+  if (!isAdminAuthenticated()) {
+    redirect("/admin");
+  }
+
+  return (
+    <main className="min-h-screen bg-slate-100">
+      <div className="mx-auto max-w-6xl px-5 py-8">
+        <div className="mb-6 flex items-center justify-between">
+          <h1 className="text-2xl font-bold text-slate-900">관리자 대시보드</h1>
+          <LogoutButton />
+        </div>
+        <AdminTable />
+      </div>
+    </main>
+  );
+}

@@ -1,0 +1,113 @@
+"use client";
+
+// Step 6: 결제 — Mock 모드는 자동 성공 처리
+import React, { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { StepForm } from "@/components/StepForm";
+import { Button } from "@/components/ui/Button";
+import { Card } from "@/components/ui/Card";
+import { LegalNotice } from "@/components/ui/LegalNotice";
+import { loadAgreementId, clearForm } from "@/lib/form-store";
+import { SERVICE_PRICE, PAYMENT_PRODUCT_NAME } from "@/lib/config";
+import { formatNumber } from "@/lib/interest-calc";
+
+// Mock 모드 여부 (클라이언트 노출 가능한 NEXT_PUBLIC 변수)
+const MOCK = process.env.NEXT_PUBLIC_MOCK_MODE !== "false";
+
+export function Step6Payment() {
+  const router = useRouter();
+  const [agreementId, setAgreementId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const id = loadAgreementId();
+    if (!id) {
+      router.replace("/create/step/1");
+      return;
+    }
+    setAgreementId(id);
+  }, [router]);
+
+  // 결제 진행
+  const handlePay = async () => {
+    if (!agreementId) return;
+    setLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/payment/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          agreementId,
+          amount: SERVICE_PRICE,
+          // 실모드에서는 토스 위젯에서 받은 paymentKey/orderId 를 전달
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "결제 처리 실패");
+      const completeId = agreementId;
+      clearForm();
+      router.push(`/complete/${completeId}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "결제 처리 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!agreementId) return null;
+
+  return (
+    <StepForm
+      step={6}
+      title="결제"
+      description="대여약정서 작성 및 내용증명 발송 서비스 비용을 결제합니다."
+    >
+      <div className="space-y-5">
+        {/* 결제 요약 */}
+        <Card>
+          <h3 className="mb-3 font-semibold text-slate-900">결제 요약</h3>
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3 text-sm">
+            <span className="text-slate-600">{PAYMENT_PRODUCT_NAME}</span>
+            <span className="font-medium">
+              {formatNumber(SERVICE_PRICE)}원
+            </span>
+          </div>
+          <div className="flex items-center justify-between pt-3">
+            <span className="font-semibold text-slate-900">총 결제금액</span>
+            <span className="text-xl font-bold text-brand-700">
+              {formatNumber(SERVICE_PRICE)}원
+            </span>
+          </div>
+        </Card>
+
+        {MOCK ? (
+          <LegalNotice tone="warn" title="Mock 모드 안내">
+            데모 환경입니다. 실제 결제 없이 자동으로 결제 성공 처리됩니다.
+          </LegalNotice>
+        ) : (
+          <LegalNotice tone="info">
+            토스페이먼츠 결제창을 통해 카드/계좌이체로 결제할 수 있습니다.
+          </LegalNotice>
+        )}
+
+        {error && <p className="text-sm text-red-500">{error}</p>}
+
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            onClick={() => router.push("/create/step/5")}
+          >
+            이전
+          </Button>
+          <Button onClick={handlePay} disabled={loading} fullWidth>
+            {loading
+              ? "결제 처리 중..."
+              : `${formatNumber(SERVICE_PRICE)}원 결제하기`}
+          </Button>
+        </div>
+      </div>
+    </StepForm>
+  );
+}

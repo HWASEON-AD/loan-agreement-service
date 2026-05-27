@@ -1,0 +1,50 @@
+  ▲ Next.js 14.2.35
+  - Local:        http://localhost:3005
+  - Environments: .env.local
+
+ ✓ Starting...
+ ✓ Ready in 2.6s
+ ○ Compiling /create/step/[step] ...
+ ✓ Compiled /create/step/[step] in 1407ms (517 modules)
+ GET /create/step/1 200 in 2658ms
+ ✓ Compiled /api/agreements/create in 413ms (295 modules)
+ POST /api/agreements/create 200 in 525ms
+ ✓ Compiled /api/otp/send in 114ms (297 modules)
+[MOCK OTP] agreement=6079bf5b-26d9-45c5-89af-9253f7a99c82 signer=lender email=lender@test.com 코드: 689340 (만료: 2026-05-27T05:40:31.187Z)
+ POST /api/otp/send 200 in 176ms
+ ✓ Compiled /api/otp/verify in 123ms (299 modules)
+ POST /api/otp/verify 200 in 170ms
+ ✓ Compiled /api/agreements/[id]/sign-lender in 178ms (306 modules)
+ POST /api/agreements/6079bf5b-26d9-45c5-89af-9253f7a99c82/sign-lender 200 in 885ms
+ ✓ Compiled /api/agreements/[id]/request-borrower in 283ms (308 modules)
+[MOCK EMAIL] to=borrower@test.com subject="[가족대여닷컴] 김아버지님의 서명 요청"
+[request-borrower] 서명 링크: http://localhost:3000/sign/0a1423c0-079e-4eef-a803-60a43cbb6f2e
+ POST /api/agreements/6079bf5b-26d9-45c5-89af-9253f7a99c82/request-borrower 200 in 960ms
+ ✓ Compiled /api/agreements/[id] in 175ms (310 modules)
+ GET /api/agreements/6079bf5b-26d9-45c5-89af-9253f7a99c82 200 in 823ms
+ ○ Compiling /sign/[token] ...
+ ✓ Compiled /sign/[token] in 710ms (617 modules)
+ GET /sign/0a1423c0-079e-4eef-a803-60a43cbb6f2e 200 in 1672ms
+ ✓ Compiled /api/agreements/by-token/[token] in 288ms (339 modules)
+ GET /api/agreements/6079bf5b-26d9-45c5-89af-9253f7a99c82 200 in 639ms
+ GET /api/agreements/by-token/0a1423c0-079e-4eef-a803-60a43cbb6f2e 200 in 1197ms
+ GET /api/agreements/by-token/0a1423c0-079e-4eef-a803-60a43cbb6f2e 200 in 1194ms
+ GET /api/agreements/6079bf5b-26d9-45c5-89af-9253f7a99c82 200 in 69ms
+[MOCK OTP] agreement=6079bf5b-26d9-45c5-89af-9253f7a99c82 signer=borrower email=borrower@test.com 코드: 926427 (만료: 2026-05-27T05:40:42.709Z)
+ POST /api/otp/send 200 in 31ms
+ POST /api/otp/verify 200 in 25ms
+ GET /api/agreements/6079bf5b-26d9-45c5-89af-9253f7a99c82 200 in 53ms
+ ○ Compiling /api/agreements/[id]/sign-borrower ...
+ ✓ Compiled /api/agreements/[id]/sign-borrower in 1812ms (518 modules)
+[MOCK EMAIL] to=lender@test.com subject="[가족대여닷컴] 상대방 서명이 완료되었습니다"
+ POST /api/agreements/6079bf5b-26d9-45c5-89af-9253f7a99c82/sign-borrower 200 in 4508ms
+ GET /api/agreements/6079bf5b-26d9-45c5-89af-9253f7a99c82 200 in 278ms
+ ✓ Compiled /api/payment/confirm in 396ms (520 modules)
+[MOCK PAYMENT] agreement=6079bf5b-26d9-45c5-89af-9253f7a99c82 amount=30000 자동 결제 성공
+[MOCK EMAIL] to=lender@test.com subject="[가족대여닷컴] 접수가 완료되었습니다"
+[MOCK EMAIL] to=borrower@test.com subject="[가족대여닷컴] 접수가 완료되었습니다"
+ POST /api/payment/confirm 200 in 457ms
+ ○ Compiling /complete/[id] ...
+ ✓ Compiled /complete/[id] in 695ms (807 modules)
+ GET /api/agreements/6079bf5b-26d9-45c5-89af-9253f7a99c82 200 in 73ms
+ GET /api/agreements/6079bf5b-26d9-45c5-89af-9253f7a99c82 200 in 87ms
