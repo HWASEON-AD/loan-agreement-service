@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Footer } from "@/components/Footer";
 import { SERVICE_NAME } from "@/lib/config";
 
-export const metadata = { title: "개인정보처리방침 | 사이트 내지마요" };
+export const metadata = { title: "개인정보처리방침 | / 내지마요" };
 
 export default function PrivacyPage() {
   return (

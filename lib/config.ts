@@ -9,7 +9,7 @@ export function isMockMode(): boolean {
 }
 
 // 서비스 기본 정보
-export const SERVICE_NAME = "사이트 내지마요";
+export const SERVICE_NAME = "/ 내지마요";
 export const SERVICE_PRICE = 30000; // 기본 패키지 가격 (원)
 export const SUBSCRIPTION_PRICE = 9900; // 이자 관리 구독 (월, 원)
 
