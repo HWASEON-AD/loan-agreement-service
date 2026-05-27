@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Footer } from "@/components/Footer";
 import { SERVICE_NAME } from "@/lib/config";
 
-export const metadata = { title: "이용약관 | 가족대여닷컴" };
+export const metadata = { title: "이용약관 | 사이트 내지마요" };
 
 export default function TermsPage() {
   return (
