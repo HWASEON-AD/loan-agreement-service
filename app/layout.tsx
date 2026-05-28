@@ -18,6 +18,9 @@ export default function RootLayout({
     <html lang="ko">
       <body className="font-sans antialiased text-slate-900 bg-slate-50">
         {children}
+        <footer className="py-6 text-center text-xs text-slate-400 border-t border-slate-200 bg-white mt-auto">
+          대표자 : 민기태 &nbsp;|&nbsp; gt.min@hwaseon.com &nbsp;|&nbsp; 010-3097-7823
+        </footer>
       </body>
     </html>
   );
