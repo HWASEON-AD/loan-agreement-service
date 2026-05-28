@@ -30,7 +30,7 @@ export function LandingHero() {
             </button>
           </Link>
           <Link href="/funding-plan">
-            <button className="inline-flex items-center justify-center rounded-xl border border-white bg-brand-700 px-8 py-4 text-base font-semibold text-white transition-colors hover:bg-brand-800">
+            <button className="inline-flex items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-brand-700 transition-colors hover:bg-slate-100">
               자금조달계획서 AI 자동작성 →
             </button>
           </Link>
