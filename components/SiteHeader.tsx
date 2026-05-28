@@ -8,8 +8,8 @@ function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 group">
       {/* 슬래시 아이콘 */}
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-red-600 text-white font-black text-xl leading-none select-none shadow-sm">
-        ₩
+      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-700 text-white font-bold text-lg leading-none select-none">
+        /
       </span>
       <span className="text-lg font-bold text-slate-900 group-hover:text-brand-700 transition-colors">
         내지마요
@@ -19,8 +19,8 @@ function Logo() {
 }
 
 const NAV_ITEMS = [
-  { href: "/create/step/1", label: "약정서 작성" },
-  { href: "/funding-plan", label: "자금조달계획서 AI" },
+  { href: "/create/step/1", label: "약정서 작성", highlight: false },
+  { href: "/funding-plan", label: "자금조달계획서 AI", highlight: true },
 ];
 
 export function SiteHeader() {
@@ -49,10 +49,12 @@ export function SiteHeader() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
+                className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
                   active
-                    ? "bg-brand-50 text-brand-700"
-                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-brand-700 text-white"
+                    : item.highlight
+                    ? "bg-brand-50 text-brand-700 hover:bg-brand-100"
+                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
                 }`}
               >
                 {item.label}
