@@ -3,6 +3,7 @@ import React from "react";
 import { LandingHero } from "@/components/LandingHero";
 import { ProcessSteps } from "@/components/ProcessSteps";
 import { PriceCard } from "@/components/PriceCard";
+import { TaxConsultSection } from "@/components/TaxConsultSection";
 import { Footer } from "@/components/Footer";
 
 // 문제 제기 섹션
@@ -161,6 +162,7 @@ export default function HomePage() {
       <ProblemSection />
       <ProcessSteps />
       <PriceCard />
+      <TaxConsultSection />
       <LegalEffectSection />
       <FaqSection />
       <Footer />
