@@ -19,8 +19,8 @@ function Logo() {
 }
 
 const NAV_ITEMS = [
-  { href: "/create/step/1", label: "약정서 작성", highlight: false },
-  { href: "/funding-plan", label: "자금조달계획서 AI", highlight: true },
+  { href: "/create/step/1", label: "약정서 작성" },
+  { href: "/funding-plan", label: "자금조달계획서 AI" },
 ];
 
 export function SiteHeader() {
@@ -49,12 +49,10 @@ export function SiteHeader() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+                className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
                   active
-                    ? "bg-brand-700 text-white"
-                    : item.highlight
-                    ? "bg-brand-50 text-brand-700 hover:bg-brand-100"
-                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                    ? "bg-slate-100 text-slate-900 font-semibold"
+                    : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
                 }`}
               >
                 {item.label}
