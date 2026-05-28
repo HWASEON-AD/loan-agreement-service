@@ -8,12 +8,8 @@ function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 group">
       {/* 슬래시 아이콘 */}
-      {/* ₩ + 사선: 증여세 내지마요 */}
-      <span className="relative flex h-8 w-8 items-center justify-center rounded-lg bg-brand-700 select-none overflow-hidden">
-        <span className="text-white font-bold text-sm leading-none">₩</span>
-        <span className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="block h-0.5 w-6 bg-white/90 rotate-45" />
-        </span>
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-700 text-white font-bold text-sm select-none">
+        ₩
       </span>
       <span className="text-lg font-bold text-slate-900 group-hover:text-brand-700 transition-colors">
         내지마요
