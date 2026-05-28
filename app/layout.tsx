@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { SiteHeader } from "@/components/SiteHeader";
 
 // 사이트 전역 메타데이터
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export default function RootLayout({
   return (
     <html lang="ko">
       <body className="font-sans antialiased text-slate-900 bg-slate-50">
+        <SiteHeader />
         {children}
         <footer className="py-8 text-center text-xs text-slate-400 border-t border-slate-200 bg-white mt-auto space-y-1.5">
           <p className="font-medium text-slate-500">© 2026 내지마요. All rights reserved. (HWASEONAD)</p>
