@@ -12,7 +12,7 @@ export function LandingHero() {
         <span className="mb-4 inline-block rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium text-brand-100">
           전자서명 + 우체국 내용증명 풀패키지
         </span>
-        <h1 className="text-3xl font-bold sm:text-5xl" style={{lineHeight: "1.6"}}>
+        <h1 className="text-3xl font-bold sm:text-5xl" style={{lineHeight: "1.3"}}>
           가족간 금전거래<br />
           자금조달계획서<br />
           한번에! 완벽하게!
