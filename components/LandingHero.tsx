@@ -31,20 +31,10 @@ export function LandingHero() {
               지금 약정서 작성하기
             </Button>
           </Link>
-          <Link href="#process">
-            <Button
-              variant="ghost"
-              className="px-8 py-4 text-white hover:bg-white/10"
-            >
-              서비스 알아보기
-            </Button>
-          </Link>
-        </div>
-        <div className="mt-4 flex justify-center">
           <Link href="/funding-plan">
             <Button
               variant="ghost"
-              className="px-6 py-3 text-sm text-brand-100 underline-offset-4 hover:bg-white/10 hover:underline"
+              className="px-8 py-4 text-base !text-white hover:bg-white/10"
             >
               자금조달계획서 AI 자동작성 →
             </Button>
