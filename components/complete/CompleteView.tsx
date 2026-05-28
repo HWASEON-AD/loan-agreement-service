@@ -10,6 +10,7 @@ import { Footer } from "@/components/Footer";
 import { SUBSCRIPTION_PRICE } from "@/lib/config";
 import { formatNumber } from "@/lib/interest-calc";
 import type { Agreement, Order } from "@/lib/types";
+import { trackPixelEvent } from "@/components/MetaPixel";
 
 export function CompleteView({ agreementId }: { agreementId: string }) {
   const [agreement, setAgreement] = useState<Agreement | null>(null);
@@ -26,6 +27,13 @@ export function CompleteView({ agreementId }: { agreementId: string }) {
         if (res.ok) {
           setAgreement(data.agreement);
           setOrder(data.order);
+          // 약정서 완료 = 구매 전환 이벤트
+          trackPixelEvent("Purchase", {
+            currency: "KRW",
+            value: data.order?.amount ?? 30000,
+            content_name: "대여약정서",
+            content_type: "product",
+          });
         }
       } catch {
         // 조회 실패 무시

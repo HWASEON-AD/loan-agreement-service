@@ -1,9 +1,12 @@
 // 랜딩 Hero 섹션
+"use client";
+
 import React from "react";
 import Link from "next/link";
 import { Button } from "./ui/Button";
 import { SERVICE_PRICE } from "@/lib/config";
 import { formatNumber } from "@/lib/interest-calc";
+import { trackPixelEvent } from "@/components/MetaPixel";
 
 export function LandingHero() {
   return (
@@ -24,7 +27,10 @@ export function LandingHero() {
           </span>
         </p>
         <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link href="/create/step/1">
+          <Link
+            href="/create/step/1"
+            onClick={() => trackPixelEvent("InitiateCheckout", { content_name: "대여약정서", currency: "KRW", value: SERVICE_PRICE })}
+          >
             <button className="inline-flex items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-brand-700 transition-all hover:bg-slate-100 hover:scale-105 hover:shadow-lg">
               지금 약정서 작성하기
             </button>
