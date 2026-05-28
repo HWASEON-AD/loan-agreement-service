@@ -8,7 +8,7 @@ function Logo() {
   return (
     <Link href="/" className="flex items-center gap-2 group">
       {/* 슬래시 아이콘 */}
-      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-700 text-white font-bold text-sm select-none">
+      <span className="flex h-8 w-8 items-center justify-center rounded-full bg-brand-700 text-white font-black text-xl leading-none select-none">
         ₩
       </span>
       <span className="text-lg font-bold text-slate-900 group-hover:text-brand-700 transition-colors">
