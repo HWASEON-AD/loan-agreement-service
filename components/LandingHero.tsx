@@ -4,7 +4,7 @@
 import React from "react";
 import Link from "next/link";
 import { Button } from "./ui/Button";
-import { SERVICE_PRICE } from "@/lib/config";
+import { SERVICE_PRICE, SERVICE_PRICE_ORIGINAL } from "@/lib/config";
 import { formatNumber } from "@/lib/interest-calc";
 import { trackPixelEvent } from "@/components/MetaPixel";
 
@@ -21,10 +21,22 @@ export function LandingHero() {
           한번에! 완벽하게!
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base text-brand-100 sm:text-lg">
-          대여약정서 + 전자서명 + 우체국 내용증명 — 단{" "}
-          <span className="font-bold text-white">
-            {formatNumber(SERVICE_PRICE)}원
-          </span>
+          대여약정서 + 전자서명 + 우체국 내용증명 —{" "}
+          {SERVICE_PRICE === 0 ? (
+            <>
+              <span className="font-bold text-white/60 line-through">
+                {formatNumber(SERVICE_PRICE_ORIGINAL)}원
+              </span>
+              {" "}
+              <span className="rounded-full bg-red-500 px-2 py-0.5 text-sm font-bold text-white">
+                무료 이벤트
+              </span>
+            </>
+          ) : (
+            <span className="font-bold text-white">
+              단 {formatNumber(SERVICE_PRICE)}원
+            </span>
+          )}
         </p>
         <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link

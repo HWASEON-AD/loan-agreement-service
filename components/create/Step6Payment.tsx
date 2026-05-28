@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LegalNotice } from "@/components/ui/LegalNotice";
 import { loadAgreementId, clearForm } from "@/lib/form-store";
-import { SERVICE_PRICE, PAYMENT_PRODUCT_NAME } from "@/lib/config";
+import { SERVICE_PRICE, SERVICE_PRICE_ORIGINAL, PAYMENT_PRODUCT_NAME } from "@/lib/config";
 import { formatNumber } from "@/lib/interest-calc";
 
 // Mock 모드 여부 (클라이언트 노출 가능한 NEXT_PUBLIC 변수)
@@ -78,9 +78,16 @@ export function Step6Payment() {
           </div>
           <div className="flex items-center justify-between pt-3">
             <span className="font-semibold text-slate-900">총 결제금액</span>
-            <span className="text-xl font-bold text-brand-700">
-              {formatNumber(SERVICE_PRICE)}원
-            </span>
+            <div className="text-right">
+              {SERVICE_PRICE === 0 && (
+                <span className="mr-2 text-sm text-slate-400 line-through">
+                  {formatNumber(SERVICE_PRICE_ORIGINAL)}원
+                </span>
+              )}
+              <span className="text-xl font-bold text-brand-700">
+                {SERVICE_PRICE === 0 ? "무료 이벤트" : `${formatNumber(SERVICE_PRICE)}원`}
+              </span>
+            </div>
           </div>
         </Card>
 
