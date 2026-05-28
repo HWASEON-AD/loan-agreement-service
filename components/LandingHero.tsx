@@ -10,9 +10,18 @@ import { trackPixelEvent } from "@/components/MetaPixel";
 
 export function LandingHero() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-brand-900 to-brand-700 text-white">
-      <div className="mx-auto max-w-5xl px-6 py-20 text-center sm:py-28">
-        <span className="mb-4 inline-block rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium text-brand-100">
+    <section
+      className="relative overflow-hidden text-white"
+      style={{
+        backgroundImage: "url('/hero-bg.jpg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center top",
+      }}
+    >
+      {/* 어두운 오버레이 — 텍스트 가독성 */}
+      <div className="absolute inset-0 bg-black/55" />
+      <div className="relative mx-auto max-w-5xl px-6 py-20 text-center sm:py-28">
+        <span className="mb-4 inline-block rounded-full bg-white/20 px-4 py-1.5 text-sm font-medium text-white/90">
           전자서명 + 우체국 내용증명 풀패키지
         </span>
         <h1 className="text-3xl font-bold sm:text-5xl" style={{lineHeight: "1.35"}}>
@@ -20,7 +29,7 @@ export function LandingHero() {
           자금조달계획서<br />
           한번에! 완벽하게!
         </h1>
-        <p className="mx-auto mt-5 max-w-2xl text-base text-brand-100 sm:text-lg">
+        <p className="mx-auto mt-5 max-w-2xl text-base text-white/80 sm:text-lg">
           대여약정서 + 전자서명 + 우체국 내용증명 — 단{" "}
           <span className="font-bold text-white">
             {formatNumber(SERVICE_PRICE)}원
@@ -45,3 +54,4 @@ export function LandingHero() {
     </section>
   );
 }
+
