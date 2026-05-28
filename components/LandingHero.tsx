@@ -38,6 +38,16 @@ export function LandingHero() {
             </Button>
           </Link>
         </div>
+        <div className="mt-4 flex justify-center">
+          <Link href="/funding-plan">
+            <Button
+              variant="ghost"
+              className="px-6 py-3 text-sm text-brand-100 underline-offset-4 hover:bg-white/10 hover:underline"
+            >
+              자금조달계획서 AI 자동작성 →
+            </Button>
+          </Link>
+        </div>
       </div>
     </section>
   );
