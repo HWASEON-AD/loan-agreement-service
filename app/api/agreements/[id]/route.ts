@@ -1,7 +1,11 @@
-// GET /api/agreements/[id] — 약정서 단건 조회
+// GET /api/agreements/[id] — 약정서 단건 조회 (서명 감사로그 포함)
 
 import { NextRequest, NextResponse } from "next/server";
-import { getAgreement, getOrderByAgreement } from "@/lib/db";
+import {
+  getAgreement,
+  getOrderByAgreement,
+  getSignaturesByAgreement,
+} from "@/lib/db";
 
 export async function GET(
   _req: NextRequest,
@@ -16,8 +20,10 @@ export async function GET(
       );
     }
     const order = await getOrderByAgreement(params.id);
+    // 상세 모달에서 서명 이미지/일시/IP 표시를 위해 감사로그를 함께 반환
+    const signatures = await getSignaturesByAgreement(params.id);
 
-    return NextResponse.json({ agreement, order });
+    return NextResponse.json({ agreement, order, signatures });
   } catch (err) {
     console.error("[agreements/get] 조회 실패:", err);
     return NextResponse.json(
