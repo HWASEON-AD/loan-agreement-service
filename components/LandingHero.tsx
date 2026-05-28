@@ -15,7 +15,9 @@ export function LandingHero() {
         <h1 className="text-3xl font-bold leading-tight sm:text-5xl">
           가족 간 금전 거래,
           <br />
-          이제 법적으로 완벽하게
+          자금조달계획서까지
+          <br />
+          한번에! 완벽하게!
         </h1>
         <p className="mx-auto mt-5 max-w-2xl text-base text-brand-100 sm:text-lg">
           대여약정서 + 전자서명 + 우체국 내용증명 — 단{" "}
