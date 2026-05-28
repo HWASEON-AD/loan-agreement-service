@@ -105,6 +105,7 @@ export interface Order {
   paidAt: string | null;
   certMailStatus: CertMailStatus;
   certMailSentAt: string | null;
+  trackingNumber: string | null; // 우체국 등기번호
   notes: string | null;
   createdAt: string;
 }

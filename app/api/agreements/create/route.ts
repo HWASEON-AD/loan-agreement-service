@@ -108,6 +108,7 @@ export async function POST(req: NextRequest) {
       paidAt: null,
       certMailStatus: "pending",
       certMailSentAt: null,
+      trackingNumber: null,
       notes: null,
       createdAt: now,
     };

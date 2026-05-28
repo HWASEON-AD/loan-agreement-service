@@ -113,6 +113,8 @@ export function AgreementModal({ agreementId, onClose }: AgreementModalProps) {
   const [detail, setDetail] = useState<AgreementDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [trackingInput, setTrackingInput] = useState("");
+  const [markingState, setMarkingState] = useState<"idle" | "loading" | "done" | "error">("idle");
 
   // 상세 데이터 로드
   useEffect(() => {
@@ -295,6 +297,56 @@ export function AgreementModal({ agreementId, onClose }: AgreementModalProps) {
                 party={agreement.borrower}
                 signature={borrowerSig}
               />
+
+              {/* 내용증명 발송완료 마킹 */}
+              <section>
+                <h3 className="mb-3 border-b border-slate-200 pb-1 text-sm font-semibold text-slate-700">
+                  내용증명 발송완료 처리
+                </h3>
+                {markingState === "done" ? (
+                  <p className="rounded-lg bg-green-50 p-3 text-sm font-medium text-green-700">
+                    ✓ 발송완료 처리됐습니다. 고객에게 등기번호 이메일이 발송됐습니다.
+                  </p>
+                ) : (
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <input
+                      type="text"
+                      value={trackingInput}
+                      onChange={(e) => setTrackingInput(e.target.value)}
+                      placeholder="등기번호 입력 (예: 1234567890123)"
+                      className="flex-1 rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none"
+                    />
+                    <button
+                      disabled={markingState === "loading"}
+                      onClick={async () => {
+                        if (!trackingInput.trim()) {
+                          alert("등기번호를 입력해주세요.");
+                          return;
+                        }
+                        setMarkingState("loading");
+                        try {
+                          // orderId는 agreementId 기반으로 관리자 API에서 찾음
+                          const res = await fetch(`/api/admin/agreements/${agreementId}/mark-sent`, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ trackingNumber: trackingInput.trim() }),
+                          });
+                          if (!res.ok) throw new Error("처리 실패");
+                          setMarkingState("done");
+                        } catch {
+                          setMarkingState("error");
+                        }
+                      }}
+                      className="rounded-lg bg-brand-700 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-800 disabled:opacity-50"
+                    >
+                      {markingState === "loading" ? "처리 중..." : "발송완료 처리"}
+                    </button>
+                  </div>
+                )}
+                {markingState === "error" && (
+                  <p className="mt-2 text-xs text-red-500">처리 중 오류가 발생했습니다. 다시 시도해주세요.</p>
+                )}
+              </section>
 
               {/* 문서 다운로드 */}
               <section>

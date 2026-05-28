@@ -54,6 +54,7 @@ function rowToOrder(row: any): Order {
     paidAt: row.paid_at ?? null,
     certMailStatus: row.cert_mail_status,
     certMailSentAt: row.cert_mail_sent_at ?? null,
+    trackingNumber: row.tracking_number ?? null,
     notes: row.notes ?? null,
     createdAt: row.created_at,
   };

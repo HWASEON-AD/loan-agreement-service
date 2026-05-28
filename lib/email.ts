@@ -89,6 +89,40 @@ export async function sendBorrowerSignedNotice(
   await send(to, `[${SERVICE_NAME}] 상대방 서명이 완료되었습니다`, html);
 }
 
+// 내용증명 발송 완료 알림 이메일 (등기번호 + 조회 링크)
+export async function sendCertMailTrackingEmail(
+  to: string,
+  name: string,
+  agreementId: string,
+  trackingNumber: string
+): Promise<void> {
+  const baseUrl = getBaseUrl();
+  const trackingUrl = `https://service.epost.go.kr/trace.RetrieveDomesticObjectNumber.comm?sid1=${trackingNumber}`;
+  const completeUrl = `${baseUrl}/complete/${agreementId}`;
+  const html = `
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+      <h2 style="color:#1d4ed8;">${SERVICE_NAME} — 내용증명 발송 완료</h2>
+      <p>${name}님, 우체국 내용증명이 발송되었습니다.</p>
+      <div style="background:#f1f5f9;border-radius:10px;padding:16px;margin:20px 0;">
+        <p style="margin:0 0 6px 0;font-size:13px;color:#64748b;">등기번호</p>
+        <p style="margin:0;font-size:22px;font-weight:bold;letter-spacing:3px;color:#1d4ed8;">${trackingNumber}</p>
+      </div>
+      <a href="${trackingUrl}" style="display:inline-block;padding:12px 20px;background:#1d4ed8;color:#fff;border-radius:8px;text-decoration:none;margin-bottom:12px;">
+        우체국 배송 조회하기
+      </a>
+      <br/>
+      <a href="${completeUrl}" style="display:inline-block;padding:10px 16px;border:1px solid #cbd5e1;color:#475569;border-radius:8px;text-decoration:none;font-size:13px;margin-top:8px;">
+        약정서 PDF 다운로드
+      </a>
+      <p style="color:#94a3b8;font-size:12px;margin-top:24px;">
+        상대방 수령 후 배송 상태가 업데이트됩니다.<br/>
+        문의: gt.min@hwaseon.com
+      </p>
+    </div>
+  `;
+  await send(to, `[${SERVICE_NAME}] 내용증명이 발송되었습니다 (등기: ${trackingNumber})`, html);
+}
+
 // 최종 확인 이메일 (결제 완료 후 PDF 다운로드 링크)
 export async function sendCompletionEmail(
   to: string,
