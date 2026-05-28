@@ -13,6 +13,8 @@ import { formatNumber } from "@/lib/interest-calc";
 
 // Mock 모드 여부 (클라이언트 노출 가능한 NEXT_PUBLIC 변수)
 const MOCK = process.env.NEXT_PUBLIC_MOCK_MODE !== "false";
+// 토스페이먼츠 클라이언트 키 (실모드 시 사용 — 위젯 SDK 연동은 추후 작업)
+const TOSS_CLIENT_KEY = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY || "";
 
 export function Step6Payment() {
   const router = useRouter();
@@ -86,9 +88,14 @@ export function Step6Payment() {
           <LegalNotice tone="warn" title="Mock 모드 안내">
             데모 환경입니다. 실제 결제 없이 자동으로 결제 성공 처리됩니다.
           </LegalNotice>
-        ) : (
+        ) : TOSS_CLIENT_KEY ? (
           <LegalNotice tone="info">
             토스페이먼츠 결제창을 통해 카드/계좌이체로 결제할 수 있습니다.
+          </LegalNotice>
+        ) : (
+          <LegalNotice tone="warn" title="결제 설정 준비 중">
+            토스페이먼츠 가맹점 등록 및 클라이언트 키 설정이 필요합니다.
+            관리자에게 문의해주세요.
           </LegalNotice>
         )}
 
@@ -101,7 +108,11 @@ export function Step6Payment() {
           >
             이전
           </Button>
-          <Button onClick={handlePay} disabled={loading} fullWidth>
+          <Button
+            onClick={handlePay}
+            disabled={loading || (!MOCK && !TOSS_CLIENT_KEY)}
+            fullWidth
+          >
             {loading
               ? "결제 처리 중..."
               : `${formatNumber(SERVICE_PRICE)}원 결제하기`}

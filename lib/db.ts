@@ -367,6 +367,7 @@ export async function updateOrder(
   if (patch.paidAt !== undefined) dbPatch.paid_at = patch.paidAt;
   if (patch.certMailStatus !== undefined) dbPatch.cert_mail_status = patch.certMailStatus;
   if (patch.certMailSentAt !== undefined) dbPatch.cert_mail_sent_at = patch.certMailSentAt;
+  if (patch.trackingNumber !== undefined) dbPatch.tracking_number = patch.trackingNumber;
   if (patch.notes !== undefined) dbPatch.notes = patch.notes;
 
   const { data, error } = await sb

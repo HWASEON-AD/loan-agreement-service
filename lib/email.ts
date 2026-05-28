@@ -1,45 +1,73 @@
-// 이메일 발송 — Resend 사용. Mock 모드에서는 console.log 만 한다.
+// 이메일 발송 — nodemailer SMTP 사용. Mock 모드에서는 console.log 만 한다.
 
 import { isMockMode, getBaseUrl, SERVICE_NAME } from "./config";
+import nodemailer, { type Transporter } from "nodemailer";
 
-// Resend API 로 이메일 발송 (실모드 전용)
-async function sendViaResend(
+// 발신자 주소 — SMTP_USER 환경변수 우선, 미설정 시 기본 주소
+const FROM_EMAIL = process.env.SMTP_USER || "gt.min@hwaseon.com";
+const FROM_ADDRESS = `${SERVICE_NAME} <${FROM_EMAIL}>`;
+
+// 전역 캐시(서버리스 환경에서도 동일 인스턴스 내 재사용)로 트랜스포터를 싱글톤 보관
+const globalForTransporter = globalThis as unknown as {
+  __loanAgreementMailTransporter?: Transporter;
+};
+
+// SMTP 트랜스포터 싱글톤 — 모듈 1회 호출당 1회 생성 후 재사용
+function getTransporter(): Transporter {
+  if (globalForTransporter.__loanAgreementMailTransporter) {
+    return globalForTransporter.__loanAgreementMailTransporter;
+  }
+  const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || "smtp.worksmobile.com",
+    port: Number(process.env.SMTP_PORT) || 587,
+    secure: false, // 포트 587 → STARTTLS (secure=false)
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+    tls: {
+      rejectUnauthorized: true,
+    },
+  });
+  globalForTransporter.__loanAgreementMailTransporter = transporter;
+  return transporter;
+}
+
+// SMTP 로 이메일 발송 (실모드 전용)
+async function sendViaSmtp(
   to: string,
   subject: string,
   html: string
 ): Promise<void> {
-  const apiKey = process.env.RESEND_API_KEY;
-  if (!apiKey) {
-    throw new Error("RESEND_API_KEY 가 설정되지 않았습니다.");
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    throw new Error("SMTP_USER 또는 SMTP_PASS 환경변수가 설정되지 않았습니다.");
   }
 
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: `${SERVICE_NAME} <noreply@example.com>`,
+  try {
+    const transporter = getTransporter();
+    const info = await transporter.sendMail({
+      from: FROM_ADDRESS,
       to,
       subject,
       html,
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`Resend 발송 실패 (${res.status}): ${text}`);
+    });
+    console.log(
+      `[EMAIL] 발송 완료 messageId=${info.messageId} to=${to} subject="${subject}"`
+    );
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[EMAIL] 발송 실패 to=${to} subject="${subject}": ${msg}`);
+    throw new Error(`SMTP 발송 실패: ${msg}`);
   }
 }
 
-// 공통 발송 래퍼 — Mock 이면 콘솔 출력
+// 공통 발송 래퍼 — Mock 이면 콘솔 출력만
 async function send(to: string, subject: string, html: string): Promise<void> {
   if (isMockMode()) {
     console.log(`[MOCK EMAIL] to=${to} subject="${subject}"`);
     return;
   }
-  await sendViaResend(to, subject, html);
+  await sendViaSmtp(to, subject, html);
 }
 
 // OTP 인증번호 이메일
