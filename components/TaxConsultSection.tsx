@@ -41,7 +41,7 @@ export function TaxConsultSection() {
             <div className="mb-1 text-xs font-semibold uppercase tracking-wider text-brand-600">
               협력 세무 전문가
             </div>
-            <h3 className="text-xl font-bold text-slate-900">정부용 전 세무서장</h3>
+            <h3 className="text-xl font-bold text-slate-900">전직 용산세무서장 출신</h3>
             <p className="mt-0.5 text-sm text-slate-500">국립세무대학 4기 · 국세청 30년 경력</p>
 
             {/* 주요 약력 */}
