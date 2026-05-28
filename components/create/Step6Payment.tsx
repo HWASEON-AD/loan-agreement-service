@@ -84,7 +84,11 @@ export function Step6Payment() {
           </div>
         </Card>
 
-        {MOCK ? (
+        {SERVICE_PRICE === 0 ? (
+          <LegalNotice tone="info" title="현재 무료 서비스">
+            지금은 무료로 이용하실 수 있습니다. 서비스 신청 후 내용증명이 발송됩니다.
+          </LegalNotice>
+        ) : MOCK ? (
           <LegalNotice tone="warn" title="Mock 모드 안내">
             데모 환경입니다. 실제 결제 없이 자동으로 결제 성공 처리됩니다.
           </LegalNotice>
@@ -110,11 +114,13 @@ export function Step6Payment() {
           </Button>
           <Button
             onClick={handlePay}
-            disabled={loading || (!MOCK && !TOSS_CLIENT_KEY)}
+            disabled={loading || (SERVICE_PRICE > 0 && !MOCK && !TOSS_CLIENT_KEY)}
             fullWidth
           >
             {loading
-              ? "결제 처리 중..."
+              ? "처리 중..."
+              : SERVICE_PRICE === 0
+              ? "무료 신청하기"
               : `${formatNumber(SERVICE_PRICE)}원 결제하기`}
           </Button>
         </div>

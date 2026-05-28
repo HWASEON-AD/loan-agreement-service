@@ -10,7 +10,7 @@ export function isMockMode(): boolean {
 
 // 서비스 기본 정보
 export const SERVICE_NAME = "/ 내지마요";
-export const SERVICE_PRICE = 30000; // 기본 패키지 가격 (원)
+export const SERVICE_PRICE = 0; // 현재 무료 (토스페이먼츠 가맹점 등록 후 30000으로 변경)
 export const SUBSCRIPTION_PRICE = 9900; // 이자 관리 구독 (월, 원)
 
 // 결제 명목 (법적 제약: 세무 관련 문구 금지)
