@@ -25,13 +25,13 @@ export function LandingHero() {
         </p>
         <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link href="/create/step/1">
-            <button className="inline-flex items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-brand-700 transition-colors hover:bg-slate-100">
+            <button className="inline-flex items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-brand-700 transition-all hover:bg-slate-100 hover:scale-105 hover:shadow-lg">
               지금 약정서 작성하기
             </button>
           </Link>
           <Link href="/funding-plan">
-            <button className="inline-flex items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-brand-700 transition-colors hover:bg-slate-100">
-              자금조달계획서 AI 자동작성 →
+            <button className="inline-flex items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-brand-700 transition-all hover:bg-slate-100 hover:scale-105 hover:shadow-lg">
+              자금조달계획서 AI 자동작성
             </button>
           </Link>
         </div>
