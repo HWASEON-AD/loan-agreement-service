@@ -116,9 +116,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ agreementId: agreement.id });
   } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
     console.error("[create] 약정서 생성 실패:", err);
     return NextResponse.json(
-      { error: "약정서 생성 중 오류가 발생했습니다." },
+      { error: "약정서 생성 중 오류가 발생했습니다.", detail: msg },
       { status: 500 }
     );
   }
