@@ -100,20 +100,21 @@ export function OtpInput({ agreementId, token, signerType, onVerified }: Props) 
             placeholder="000000"
             onChange={(e) => setCode(e.target.value.replace(/[^0-9]/g, ""))}
           />
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleSend}
-              disabled={loading}
-            >
-              재발송
-            </Button>
+          <div className="flex flex-col gap-2">
             <Button
               onClick={handleVerify}
               disabled={loading || code.length !== 6}
               fullWidth
             >
               {loading ? "확인 중..." : "인증 확인"}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleSend}
+              disabled={loading}
+              fullWidth
+            >
+              {loading ? "발송 중..." : "인증번호 재발송"}
             </Button>
           </div>
         </>
