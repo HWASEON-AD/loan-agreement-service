@@ -21,7 +21,10 @@ export function Footer() {
           사안에 대해서는 전문가와 상담하시기 바랍니다.
         </p>
         <p className="mt-3 text-xs text-slate-400">
-          © {new Date().getFullYear()} {SERVICE_NAME}. All rights reserved.
+          © {new Date().getFullYear()} {SERVICE_NAME}. All rights reserved. (HWASEONAD)
+        </p>
+        <p className="mt-1 text-xs text-slate-400">
+          대표자 : gt.min@hwaseon.com &nbsp;|&nbsp; 대표 : 민기태
         </p>
       </div>
     </footer>
