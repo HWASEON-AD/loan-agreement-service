@@ -12,7 +12,7 @@ export function LandingHero() {
         <span className="mb-4 inline-block rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium text-brand-100">
           전자서명 + 우체국 내용증명 풀패키지
         </span>
-        <h1 className="text-3xl font-bold sm:text-5xl" style={{lineHeight: "1.3"}}>
+        <h1 className="text-3xl font-bold sm:text-5xl" style={{lineHeight: "1.35"}}>
           가족간 금전거래<br />
           자금조달계획서<br />
           한번에! 완벽하게!
@@ -25,15 +25,12 @@ export function LandingHero() {
         </p>
         <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link href="/create/step/1">
-            <Button
-              variant="white"
-              className="px-8 py-4 text-base transition-all hover:scale-105 hover:shadow-xl hover:shadow-white/30"
-            >
+            <button className="inline-flex items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-brand-700 transition-colors hover:bg-slate-100">
               지금 약정서 작성하기
-            </Button>
+            </button>
           </Link>
           <Link href="/funding-plan">
-            <button className="inline-flex items-center justify-center rounded-xl border border-white/70 px-8 py-4 text-base font-semibold text-white transition-all hover:bg-white hover:text-brand-700">
+            <button className="inline-flex items-center justify-center rounded-xl border border-white bg-brand-700 px-8 py-4 text-base font-semibold text-white transition-colors hover:bg-brand-800">
               자금조달계획서 AI 자동작성 →
             </button>
           </Link>
