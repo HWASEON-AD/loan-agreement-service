@@ -4,7 +4,7 @@ import Link from "next/link";
 
 export function TaxConsultSection() {
   return (
-    <section className="bg-slate-50 py-20">
+    <section id="tax-consult" className="bg-slate-50 py-20">
       <div className="mx-auto max-w-4xl px-6">
 
         {/* 섹션 타이틀 */}

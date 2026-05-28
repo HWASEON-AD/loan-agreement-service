@@ -21,6 +21,7 @@ function Logo() {
 const NAV_ITEMS = [
   { href: "/create/step/1", label: "약정서 작성" },
   { href: "/funding-plan", label: "자금조달계획서 AI 자동작성" },
+  { href: "/#tax-consult", label: "세무상담" },
 ];
 
 export function SiteHeader() {
