@@ -102,8 +102,23 @@ export function CompleteView({ agreementId }: { agreementId: string }) {
             </Button>
           )}
 
+          {/* 감사추적인증서 다운로드 */}
+          {agreement?.lenderSignToken ? (
+            <a
+              href={`/api/agreements/${agreementId}/audit-cert?token=${agreement.lenderSignToken}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <Button variant="outline" fullWidth>
+                📋 전자서명 감사추적인증서 다운로드
+              </Button>
+            </a>
+          ) : null}
+
           <LegalNotice tone="info">
             대여자(갑)와 차용자(을) 이메일로 각각 확인 안내가 발송되었습니다.
+            감사추적인증서는 분쟁 발생 시 전자서명법에 따른 증거 자료로
+            활용됩니다.
           </LegalNotice>
 
           {/* 확정일자 안내 */}
