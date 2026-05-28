@@ -1,6 +1,5 @@
 // 자금조달계획서 AI 자동작성 (3단계 위자드)
 import React from "react";
-import Link from "next/link";
 import type { Metadata } from "next";
 import { FundingWizard } from "@/components/funding/FundingWizard";
 import { LegalNotice } from "@/components/ui/LegalNotice";
@@ -17,13 +16,7 @@ export default function FundingPlanPage() {
       <div className="mx-auto max-w-2xl px-4 py-10 sm:py-14">
         {/* 헤더 */}
         <div className="mb-8">
-          <Link
-            href="/"
-            className="inline-flex items-center text-sm text-slate-500 hover:text-slate-800"
-          >
-            ← 홈으로
-          </Link>
-          <h1 className="mt-3 text-2xl font-bold text-slate-900 sm:text-3xl">
+          <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
             자금조달계획서 AI 자동작성
           </h1>
           <p className="mt-2 text-sm text-slate-500">

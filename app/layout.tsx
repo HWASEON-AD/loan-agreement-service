@@ -19,7 +19,9 @@ export default function RootLayout({
     <html lang="ko">
       <body className="font-sans antialiased text-slate-900 bg-slate-50">
         <SiteHeader />
-        {children}
+        <div className="pt-14">
+          {children}
+        </div>
         <footer className="py-8 text-center text-xs text-slate-400 border-t border-slate-200 bg-white mt-auto space-y-1.5">
           <p className="font-medium text-slate-500">© 2026 내지마요. All rights reserved. (HWASEONAD)</p>
           <p>대표자 : gt.min@hwaseon.com &nbsp;|&nbsp; 대표 : 민기태</p>
