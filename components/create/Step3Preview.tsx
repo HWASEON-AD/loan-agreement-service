@@ -84,6 +84,7 @@ export function Step3Preview() {
         <div className="flex gap-3">
           <Button
             variant="outline"
+            className="shrink-0 px-5"
             onClick={() => router.push("/create/step/2")}
           >
             이전

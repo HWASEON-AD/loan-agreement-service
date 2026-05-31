@@ -9,8 +9,8 @@ import { Footer } from "@/components/Footer";
 // 문제 제기 섹션
 function ProblemSection() {
   return (
-    <section className="bg-slate-50 py-20">
-      <div className="mx-auto max-w-4xl px-6">
+    <section className="bg-slate-50 py-12 sm:py-20">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6">
         <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
           &ldquo;가족 사이라 그냥 빌려줬다가 나중에...&rdquo;
         </h2>
@@ -50,8 +50,8 @@ function ProblemSection() {
 // 법적 효력 안내 섹션
 function LegalEffectSection() {
   return (
-    <section className="bg-white py-20">
-      <div className="mx-auto max-w-4xl px-6">
+    <section className="bg-white py-12 sm:py-20">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6">
         <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
           법적 효력 안내
         </h2>
@@ -130,8 +130,8 @@ const FAQS = [
 
 function FaqSection() {
   return (
-    <section className="bg-slate-50 py-20">
-      <div className="mx-auto max-w-3xl px-6">
+    <section className="bg-slate-50 py-12 sm:py-20">
+      <div className="mx-auto max-w-3xl px-4 sm:px-6">
         <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
           자주 묻는 질문
         </h2>

@@ -11,7 +11,7 @@ import { trackPixelEvent } from "@/components/MetaPixel";
 export function LandingHero() {
   return (
     <section className="relative overflow-hidden bg-gradient-to-b from-brand-900 to-brand-700 text-white">
-      <div className="mx-auto max-w-5xl px-6 py-20 text-center sm:py-28">
+      <div className="mx-auto max-w-5xl px-4 py-14 text-center sm:px-6 sm:py-28">
         <span className="mb-4 inline-block rounded-full bg-white/10 px-4 py-1.5 text-sm font-medium text-brand-100">
           전자서명 + 우체국 내용증명 풀패키지
         </span>
@@ -38,17 +38,18 @@ export function LandingHero() {
             </span>
           )}
         </p>
-        <div className="mt-9 flex flex-col items-center justify-center gap-3 sm:flex-row">
+        <div className="mt-9 flex flex-col items-stretch gap-3 px-2 sm:flex-row sm:items-center sm:justify-center sm:px-0">
           <Link
             href="/create/step/1"
+            className="w-full sm:w-auto"
             onClick={() => trackPixelEvent("InitiateCheckout", { content_name: "대여약정서", currency: "KRW", value: SERVICE_PRICE })}
           >
-            <button className="inline-flex items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-brand-700 transition-all hover:bg-slate-100 hover:scale-105 hover:shadow-lg">
+            <button className="w-full inline-flex items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-brand-700 transition-all hover:bg-slate-100 hover:scale-105 hover:shadow-lg">
               지금 약정서 작성하기
             </button>
           </Link>
-          <Link href="/funding-plan">
-            <button className="inline-flex items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-brand-700 transition-all hover:bg-slate-100 hover:scale-105 hover:shadow-lg">
+          <Link href="/funding-plan" className="w-full sm:w-auto">
+            <button className="w-full inline-flex items-center justify-center rounded-xl bg-white px-8 py-4 text-base font-semibold text-brand-700 transition-all hover:bg-slate-100 hover:scale-105 hover:shadow-lg">
               자금조달계획서 AI 자동작성
             </button>
           </Link>

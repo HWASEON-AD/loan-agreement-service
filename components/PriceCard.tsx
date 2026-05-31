@@ -7,8 +7,8 @@ import { formatNumber } from "@/lib/interest-calc";
 
 export function PriceCard() {
   return (
-    <section className="bg-slate-50 py-20">
-      <div className="mx-auto max-w-4xl px-6">
+    <section className="bg-slate-50 py-12 sm:py-20">
+      <div className="mx-auto max-w-4xl px-4 sm:px-6">
         <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
           합리적인 가격
         </h2>

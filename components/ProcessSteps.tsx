@@ -31,8 +31,8 @@ const STEPS = [
 
 export function ProcessSteps() {
   return (
-    <section id="process" className="bg-white py-20">
-      <div className="mx-auto max-w-5xl px-6">
+    <section id="process" className="bg-white py-12 sm:py-20">
+      <div className="mx-auto max-w-5xl px-4 sm:px-6">
         <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
           전자서명 → 우체국 내용증명 → 법적효력 완성
         </h2>
