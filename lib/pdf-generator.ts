@@ -76,7 +76,7 @@ export async function generateAgreementPdf(
   const fontBytes = await loadFontBytes();
   let font: PDFFont;
   if (fontBytes) {
-    font = await pdfDoc.embedFont(fontBytes, { subset: true });
+    font = await pdfDoc.embedFont(fontBytes, { subset: false });
   } else {
     // 폰트 로드 실패 시 표준 폰트로 폴백 (한글은 깨질 수 있으나 빌드/생성은 성공)
     const { StandardFonts } = await import("pdf-lib");
