@@ -11,8 +11,8 @@ import path from "path";
 import type { Agreement, SignatureRecord } from "./types";
 import { buildAgreementText } from "./agreement-text";
 
-// 한글 폰트 파일 경로 (프로젝트 assets)
-const FONT_PATH = path.join(process.cwd(), "assets", "fonts", "NotoSansKR-Regular.otf");
+// 한글 폰트: public/fonts (Vercel 서버 번들에 자동 포함됨)
+const FONT_PATH = path.join(process.cwd(), "public", "fonts", "NotoSansKR-Regular.otf");
 
 // 폰트 바이트 캐시
 let cachedFontBytes: Uint8Array | null = null;
