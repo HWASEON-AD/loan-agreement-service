@@ -19,14 +19,45 @@ import { SELF_FUND_KEYS, LOAN_KEYS } from "./funding-types";
 const FONT_PATH = path.join(process.cwd(), "public", "fonts", "NotoSansKR-Regular.otf");
 const HOUSING_TEMPLATE = path.join(process.cwd(), "public", "forms", "housing-form.pdf");
 
+// Vercel 서버리스 함수에서는 public/ 파일에 fs 접근 불가 → HTTP fallback
+const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
+
+async function fetchBytes(url: string): Promise<Uint8Array> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} ${url}`);
+  return new Uint8Array(await res.arrayBuffer());
+}
+
 let cachedFontBytes: Uint8Array | null = null;
 async function loadFont(): Promise<Uint8Array | null> {
   if (cachedFontBytes) return cachedFontBytes;
+  // 1) 파일 시스템 시도 (로컬 개발)
   try {
     cachedFontBytes = new Uint8Array(await readFile(FONT_PATH));
     return cachedFontBytes;
+  } catch { /* ignored */ }
+  // 2) HTTP fallback (Vercel 프로덕션)
+  try {
+    cachedFontBytes = await fetchBytes(`${BASE_URL}/fonts/NotoSansKR-Regular.otf`);
+    return cachedFontBytes;
   } catch (e) {
-    console.error("[funding-pdf] 폰트 로드 실패:", e);
+    console.error("[funding-pdf] 폰트 로드 최종 실패:", e);
+    return null;
+  }
+}
+
+let cachedTemplateBytes: Uint8Array | null = null;
+async function loadTemplate(): Promise<Uint8Array | null> {
+  if (cachedTemplateBytes) return cachedTemplateBytes;
+  try {
+    cachedTemplateBytes = new Uint8Array(await readFile(HOUSING_TEMPLATE));
+    return cachedTemplateBytes;
+  } catch { /* ignored */ }
+  try {
+    cachedTemplateBytes = await fetchBytes(`${BASE_URL}/forms/housing-form.pdf`);
+    return cachedTemplateBytes;
+  } catch (e) {
+    console.error("[funding-pdf] 주택 템플릿 로드 최종 실패:", e);
     return null;
   }
 }
@@ -407,14 +438,10 @@ export async function generateFundingPlanPdf(
   const fontBytes = await loadFont();
 
   if (step1.formType === "housing") {
-    // 원본 PDF 로드
-    let templateBytes: Uint8Array;
-    try {
-      templateBytes = new Uint8Array(await readFile(HOUSING_TEMPLATE));
-    } catch (e) {
-      console.error("[funding-pdf] 원본 PDF 로드 실패, 폴백 생성 모드:", e);
-      // 폴백: 빈 문서 생성
-      templateBytes = await (await PDFDocument.create()).save();
+    // 원본 PDF 로드 (fs 실패 시 HTTP fallback)
+    const templateBytes = await loadTemplate();
+    if (!templateBytes) {
+      throw new Error("주택 취득자금 조달계획서 원본 PDF를 로드할 수 없습니다.");
     }
 
     const pdfDoc = await PDFDocument.load(templateBytes);

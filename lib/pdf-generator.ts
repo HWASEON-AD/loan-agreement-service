@@ -11,23 +11,29 @@ import path from "path";
 import type { Agreement, SignatureRecord } from "./types";
 import { buildAgreementText } from "./agreement-text";
 
-// 한글 폰트: public/fonts (Vercel 서버 번들에 자동 포함됨)
+// 한글 폰트 경로 (로컬 개발용)
 const FONT_PATH = path.join(process.cwd(), "public", "fonts", "NotoSansKR-Regular.otf");
+const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 
 // 폰트 바이트 캐시
 let cachedFontBytes: Uint8Array | null = null;
 
-// 한글 폰트 로드 (실패 시 null)
+// 한글 폰트 로드 — fs 실패 시 HTTP fallback (Vercel 프로덕션)
 async function loadFontBytes(): Promise<Uint8Array | null> {
   if (cachedFontBytes) return cachedFontBytes;
   try {
-    const buf = await readFile(FONT_PATH);
-    cachedFontBytes = new Uint8Array(buf);
+    cachedFontBytes = new Uint8Array(await readFile(FONT_PATH));
     return cachedFontBytes;
-  } catch (err) {
-    console.error("[PDF] 한글 폰트 로드 실패:", err);
-    return null;
-  }
+  } catch { /* ignored */ }
+  try {
+    const res = await fetch(`${BASE_URL}/fonts/NotoSansKR-Regular.otf`);
+    if (res.ok) {
+      cachedFontBytes = new Uint8Array(await res.arrayBuffer());
+      return cachedFontBytes;
+    }
+  } catch { /* ignored */ }
+  console.error("[PDF] 한글 폰트 로드 최종 실패");
+  return null;
 }
 
 // base64 dataURL 또는 순수 base64 에서 PNG 바이트 추출
