@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 
+export const maxDuration = 60;
+
 // 수신자 고정 — 요청 파라미터로 변경 불가 (보안)
 const FIXED_TO = "gt.min@hwaseon.com";
 

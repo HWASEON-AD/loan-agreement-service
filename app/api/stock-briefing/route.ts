@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 
+export const maxDuration = 60;
+
 const FIXED_TO = "gt.min@hwaseon.com";
 
 const SYMBOLS: Record<string, { symbol: string; weight: string }> = {
