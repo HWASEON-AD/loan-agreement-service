@@ -26,42 +26,84 @@ interface StockResult {
   ok: boolean;
 }
 
-async function fetchStock(name: string, symbol: string): Promise<StockResult> {
+const BASE_HEADERS = {
+  "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+  "Accept": "application/json, text/plain, */*",
+  "Accept-Language": "en-US,en;q=0.9",
+  "Referer": "https://finance.yahoo.com/",
+  "Origin": "https://finance.yahoo.com",
+};
+
+function formatPrice(n: number, currency: string): string {
+  return currency === "KRW"
+    ? `${Math.round(n).toLocaleString("ko-KR")}원`
+    : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+async function fetchStockV8(symbol: string): Promise<StockResult | null> {
+  const endpoints = [
+    `https://query2.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`,
+    `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1d&range=1d`,
+  ];
+  for (const url of endpoints) {
+    try {
+      const res = await fetch(url, { headers: BASE_HEADERS, signal: AbortSignal.timeout(12000) });
+      if (!res.ok) continue;
+      const data = await res.json();
+      const meta = data?.chart?.result?.[0]?.meta;
+      if (!meta?.regularMarketPrice) continue;
+
+      const price = meta.regularMarketPrice as number;
+      const prev = (meta.previousClose ?? meta.chartPreviousClose ?? price) as number;
+      const changePct = (meta.regularMarketChangePercent as number) ?? ((price - prev) / prev * 100);
+      const currency = (meta.currency as string) ?? "";
+
+      return {
+        price: formatPrice(price, currency),
+        prev: formatPrice(prev, currency),
+        changePct: `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%`,
+        arrow: changePct >= 0 ? "▲" : "▼",
+        color: changePct >= 0 ? "#16a34a" : "#dc2626",
+        ok: true,
+      };
+    } catch {
+      continue;
+    }
+  }
+  return null;
+}
+
+async function fetchStockV11(symbol: string): Promise<StockResult | null> {
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`;
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        Accept: "application/json",
-      },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const url = `https://query2.finance.yahoo.com/v11/finance/quoteSummary/${symbol}?modules=price`;
+    const res = await fetch(url, { headers: BASE_HEADERS, signal: AbortSignal.timeout(12000) });
+    if (!res.ok) return null;
     const data = await res.json();
-    const meta = data?.chart?.result?.[0]?.meta;
-    if (!meta) throw new Error("meta 없음");
+    const p = data?.quoteSummary?.result?.[0]?.price;
+    if (!p?.regularMarketPrice?.raw) return null;
 
-    const price: number = meta.regularMarketPrice ?? 0;
-    const prev: number = meta.previousClose ?? 0;
-    const changePct: number = meta.regularMarketChangePercent ?? 0;
-    const currency: string = meta.currency ?? "";
-
-    const fmt = (n: number) =>
-      currency === "KRW"
-        ? `${Math.round(n).toLocaleString("ko-KR")}원`
-        : `$${n.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    const price = p.regularMarketPrice.raw as number;
+    const prev = (p.regularMarketPreviousClose?.raw as number) ?? price;
+    // v11 returns decimal (0.028 = 2.8%), multiply by 100
+    const changePct = ((p.regularMarketChangePercent?.raw as number) ?? 0) * 100;
+    const currency = (p.currency as string) ?? "";
 
     return {
-      price: fmt(price),
-      prev: fmt(prev),
+      price: formatPrice(price, currency),
+      prev: formatPrice(prev, currency),
       changePct: `${changePct >= 0 ? "+" : ""}${changePct.toFixed(2)}%`,
       arrow: changePct >= 0 ? "▲" : "▼",
       color: changePct >= 0 ? "#16a34a" : "#dc2626",
       ok: true,
     };
   } catch {
-    return { price: "확인 불가", prev: "-", changePct: "-", arrow: "-", color: "#6b7280", ok: false };
+    return null;
   }
+}
+
+async function fetchStock(_name: string, symbol: string): Promise<StockResult> {
+  const result = (await fetchStockV8(symbol)) ?? (await fetchStockV11(symbol));
+  return result ?? { price: "확인 불가", prev: "-", changePct: "-", arrow: "-", color: "#6b7280", ok: false };
 }
 
 function buildHtml(
@@ -129,7 +171,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  // 주가 병렬 수집
   const entries = Object.entries(SYMBOLS);
   const settled = await Promise.allSettled(
     entries.map(([name, { symbol }]) => fetchStock(name, symbol))
@@ -140,7 +181,6 @@ export async function POST(req: NextRequest) {
     results[name] = r.status === "fulfilled" ? r.value : { price: "확인 불가", prev: "-", changePct: "-", arrow: "-", color: "#6b7280", ok: false };
   });
 
-  // 시각 계산 (KST = UTC+9)
   const nowKst = new Date(Date.now() + 9 * 60 * 60 * 1000);
   const timeLabel = nowKst.toISOString().replace("T", " ").slice(0, 16);
   const session = nowKst.getUTCHours() < 12 ? "오전" : "오후";
@@ -148,7 +188,6 @@ export async function POST(req: NextRequest) {
   const html = buildHtml(results, timeLabel, session);
   const subject = `[주식 브리핑] ${timeLabel} KST ${session}`;
 
-  // 이메일 발송
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
   if (!smtpUser || !smtpPass) {
