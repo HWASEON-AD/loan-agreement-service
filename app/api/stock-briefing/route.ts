@@ -126,8 +126,8 @@ async function generateAnalysis(prompt: string): Promise<string> {
   try {
     const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
     const msg = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 300,
+      model: "claude-sonnet-4-6",
+      max_tokens: 600,
       messages: [{ role: "user", content: prompt }],
     });
     const block = msg.content[0];
@@ -236,7 +236,7 @@ export async function POST(req: NextRequest) {
     const otherText = toText(OTHER, results);
 
     const analysis = await generateAnalysis(
-      `다음은 오늘 아침 포트폴리오 주가 데이터입니다.\n\n[국장]\n${krText}\n\n[미장]\n${usText}\n\n[기타]\n${otherText}\n\n국장과 미장 각각 주요 동향을 2줄씩 요약하고, 오늘 포트폴리오 관점에서 주목할 점 1가지를 간결하게 코멘트해주세요. 총 5줄 이내로.`
+      `다음은 오늘 아침 포트폴리오 주가 데이터입니다.\n\n[국장]\n${krText}\n\n[미장]\n${usText}\n\n[기타]\n${otherText}\n\n아래 항목을 포함해서 상세 분석해주세요:\n1. 국장 동향: 주요 등락 원인 추정 및 업종 흐름\n2. 미장 동향: 주요 등락 원인 추정 및 섹터 흐름\n3. 포트폴리오 총평: 전체 수익/손실 방향성, 주목할 종목\n4. 오늘 주의사항: 오늘 매매 또는 보유 관점에서 체크할 포인트 1~2가지\n한국어로, 각 항목은 2~3줄로 명확하게 작성해주세요.`
     );
 
     const body =
@@ -254,8 +254,8 @@ export async function POST(req: NextRequest) {
     const usText = toText(US, results);
 
     const [krAnalysis, usAnalysis] = await Promise.all([
-      generateAnalysis(`다음은 오늘 국장(한국 주식) 현황입니다.\n\n${krText}\n\n주요 동향을 3줄 이내로 간결하게 분석해주세요.`),
-      generateAnalysis(`다음은 현재 미장(미국 주식) 현황입니다.\n\n${usText}\n\n주요 동향을 3줄 이내로 간결하게 분석해주세요.`),
+      generateAnalysis(`다음은 오늘 국장(한국 주식) 현황입니다.\n\n${krText}\n\n아래 항목을 포함해서 상세 분석해주세요:\n1. 전반적 시장 흐름 및 등락 원인 추정\n2. 보유 종목별 주목 포인트\n3. 오늘 오후 매매/보유 관점 체크사항\n한국어로, 각 항목 2~3줄로 작성해주세요.`),
+      generateAnalysis(`다음은 현재 미장(미국 주식) 현황입니다.\n\n${usText}\n\n아래 항목을 포함해서 상세 분석해주세요:\n1. 전반적 시장 흐름 및 등락 원인 추정\n2. 보유 종목별 주목 포인트\n3. 야간 대응 관점 체크사항\n한국어로, 각 항목 2~3줄로 작성해주세요.`),
     ]);
 
     const body =
