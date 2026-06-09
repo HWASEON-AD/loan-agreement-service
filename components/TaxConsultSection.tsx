@@ -25,12 +25,12 @@ export function TaxConsultSection() {
         {/* 전문가 카드 */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:flex">
 
-          {/* 세무사 사진 — 카드 높이에 맞춰 하단 크롭 */}
-          <div className="relative shrink-0 overflow-hidden bg-slate-100 sm:w-52">
+          {/* 세무사 사진 — 고정 높이, 하단 크롭 */}
+          <div className="h-72 shrink-0 overflow-hidden bg-slate-100 sm:w-52">
             <img
               src="/images/tax-consultant.png"
               alt="협력 세무 전문가"
-              className="absolute inset-0 h-full w-full object-cover object-top"
+              className="h-full w-full object-cover object-top"
             />
           </div>
 
