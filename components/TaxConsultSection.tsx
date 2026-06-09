@@ -23,14 +23,14 @@ export function TaxConsultSection() {
         </div>
 
         {/* 전문가 카드 */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:flex">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:grid sm:grid-cols-[13rem_1fr]">
 
           {/* 세무사 사진 */}
-          <div className="flex shrink-0 items-center justify-center overflow-hidden bg-slate-100 sm:w-52">
+          <div className="relative h-64 sm:h-auto">
             <img
               src="/images/tax-consultant.png"
               alt="협력 세무 전문가"
-              className="h-52 w-full object-cover object-top sm:h-full"
+              className="absolute inset-0 h-full w-full object-cover object-top"
             />
           </div>
 
