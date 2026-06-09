@@ -78,3 +78,44 @@ export function numberToKorean(num: number): string {
 export function formatNumber(num: number): string {
   return num.toLocaleString("ko-KR");
 }
+
+// 다음 납부일(YYYY-MM-DD) 계산 — 오늘(KST) 기준으로 billingDay(1~28)가
+// 이번 달에 아직 도래하지 않았으면 이번 달, 이미 지났으면 다음 달로 설정한다.
+export function computeNextDueDate(billingDay: number, fromIso?: string): string {
+  const base = fromIso ? new Date(fromIso) : new Date();
+  // KST 기준 연/월/일
+  const kst = new Date(base.getTime() + 9 * 60 * 60 * 1000);
+  const year = kst.getUTCFullYear();
+  const month = kst.getUTCMonth(); // 0-based
+  const day = kst.getUTCDate();
+
+  const safeDay = Math.min(Math.max(billingDay, 1), 28);
+
+  let dueYear = year;
+  let dueMonth = month;
+  if (day >= safeDay) {
+    // 이번 달 납부일이 이미 지났거나 오늘이면 다음 달
+    dueMonth += 1;
+    if (dueMonth > 11) {
+      dueMonth = 0;
+      dueYear += 1;
+    }
+  }
+  const mm = String(dueMonth + 1).padStart(2, "0");
+  const dd = String(safeDay).padStart(2, "0");
+  return `${dueYear}-${mm}-${dd}`;
+}
+
+// 특정 납부일 다음 달의 같은 날짜(YYYY-MM-DD) — 다음 회차 due_date 계산용
+export function addOneMonth(dueDate: string): string {
+  const [y, m, d] = dueDate.split("-").map(Number);
+  let year = y;
+  let month = m; // 1-based; +1 하면 다음 달
+  month += 1;
+  if (month > 12) {
+    month = 1;
+    year += 1;
+  }
+  const safeDay = Math.min(d, 28);
+  return `${year}-${String(month).padStart(2, "0")}-${String(safeDay).padStart(2, "0")}`;
+}

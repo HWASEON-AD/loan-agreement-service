@@ -1,7 +1,7 @@
 // /admin/dashboard — 관리자 대시보드 (서버 인증 가드 + 클라이언트 테이블)
 import { redirect } from "next/navigation";
 import { isAdminAuthenticated } from "@/lib/admin-auth";
-import { DashboardTable } from "@/components/admin/DashboardTable";
+import { DashboardTabs } from "@/components/admin/DashboardTabs";
 import { LogoutButton } from "@/components/admin/LogoutButton";
 
 // 캐시 없이 매 요청 인증 확인
@@ -25,7 +25,7 @@ export default function DashboardPage() {
           </div>
           <LogoutButton />
         </div>
-        <DashboardTable />
+        <DashboardTabs />
       </div>
     </main>
   );

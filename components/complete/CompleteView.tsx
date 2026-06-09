@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LegalNotice } from "@/components/ui/LegalNotice";
 import { Footer } from "@/components/Footer";
+import { TransferEvidenceSection } from "@/components/complete/TransferEvidenceSection";
 import { SUBSCRIPTION_PRICE } from "@/lib/config";
 import { formatNumber } from "@/lib/interest-calc";
 import type { Agreement, Order } from "@/lib/types";
@@ -154,6 +155,14 @@ export function CompleteView({ agreementId }: { agreementId: string }) {
             </a>
           </Card>
 
+          {/* 이체 확인증 업로드 — 토큰 필수 */}
+          {agreement?.lenderSignToken ? (
+            <TransferEvidenceSection
+              agreementId={agreementId}
+              token={agreement.lenderSignToken}
+            />
+          ) : null}
+
           {/* 이자 리마인더 구독 CTA */}
           <Card className="border-brand-200 bg-brand-50">
             <h3 className="font-semibold text-brand-800">
@@ -163,9 +172,19 @@ export function CompleteView({ agreementId }: { agreementId: string }) {
               납부일 알림과 입금 기록 관리를 도와드립니다. 월{" "}
               {formatNumber(SUBSCRIPTION_PRICE)}원.
             </p>
-            <Button variant="outline" className="mt-3" disabled>
-              준비 중
-            </Button>
+            {agreement?.lenderSignToken &&
+            agreement.interestRate > 0 ? (
+              <Link
+                href={`/subscribe/${agreementId}?token=${agreement.lenderSignToken}`}
+                className="mt-3 inline-block"
+              >
+                <Button variant="outline">이자 관리 구독 신청하기</Button>
+              </Link>
+            ) : (
+              <p className="mt-3 text-xs text-brand-900/60">
+                이자 약정이 있는 약정서에서 신청할 수 있습니다.
+              </p>
+            )}
           </Card>
 
           <Link href="/" className="block">

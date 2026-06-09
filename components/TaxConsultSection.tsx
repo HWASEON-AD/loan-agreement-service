@@ -1,6 +1,7 @@
 // 세무 전문가 상담 섹션
 import React from "react";
 import Link from "next/link";
+import { TaxConsultForm } from "./TaxConsultForm";
 
 export function TaxConsultSection() {
   return (
@@ -84,6 +85,9 @@ export function TaxConsultSection() {
                 초기 상담 무료 · 카카오 채널 연결
               </div>
             </div>
+
+            {/* 이메일 상담 신청 폼 (접이식) */}
+            <TaxConsultForm />
           </div>
         </div>
 

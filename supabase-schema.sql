@@ -104,3 +104,100 @@ CREATE POLICY "deny_anon_otp"
 
 CREATE POLICY "deny_anon_signatures"
   ON signature_records FOR ALL TO anon USING (false);
+
+-- ============================================================
+-- v2 추가: 세무상담 신청 (tax_consultations)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS tax_consultations (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name         TEXT NOT NULL,
+  phone        TEXT NOT NULL,
+  email        TEXT NOT NULL,
+  content      TEXT NOT NULL,
+  status       TEXT NOT NULL DEFAULT 'pending',
+  contacted_at TIMESTAMPTZ,
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_tax_consultations_status ON tax_consultations (status);
+CREATE INDEX IF NOT EXISTS idx_tax_consultations_created ON tax_consultations (created_at DESC);
+ALTER TABLE tax_consultations ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "deny_anon_tax_consult" ON tax_consultations FOR ALL TO anon USING (false);
+
+-- ============================================================
+-- v2 추가: 고객 갱신(재신청) 기능
+-- ============================================================
+ALTER TABLE agreements ADD COLUMN IF NOT EXISTS parent_agreement_id UUID REFERENCES agreements(id) ON DELETE SET NULL;
+
+CREATE TABLE IF NOT EXISTS expiry_notifications (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agreement_id    UUID NOT NULL REFERENCES agreements(id) ON DELETE CASCADE,
+  notify_type     TEXT NOT NULL,
+  sent_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  email_to        TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_expiry_notif_agreement ON expiry_notifications (agreement_id, notify_type);
+ALTER TABLE expiry_notifications ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "deny_anon_expiry_notif" ON expiry_notifications FOR ALL TO anon USING (false);
+
+-- ============================================================
+-- v3 추가: 이체 증빙 (transfer_evidences)
+-- ============================================================
+-- 이체 증빙
+ALTER TABLE agreements ADD COLUMN IF NOT EXISTS transfer_confirmed BOOLEAN DEFAULT false;
+ALTER TABLE agreements ADD COLUMN IF NOT EXISTS transfer_date DATE;
+ALTER TABLE agreements ADD COLUMN IF NOT EXISTS transfer_note TEXT;
+
+CREATE TABLE IF NOT EXISTS transfer_evidences (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agreement_id  UUID NOT NULL REFERENCES agreements(id) ON DELETE CASCADE,
+  file_name     TEXT NOT NULL,
+  file_url      TEXT NOT NULL,
+  file_size     INT,
+  uploaded_by   TEXT NOT NULL DEFAULT 'lender',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_transfer_evidences_agreement ON transfer_evidences (agreement_id);
+ALTER TABLE transfer_evidences ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "deny_anon_transfer" ON transfer_evidences FOR ALL TO anon USING (false);
+
+-- 이체 증빙 파일용 Storage 버킷 (Supabase 대시보드 → Storage 에서 생성하거나 아래 실행)
+-- 비공개 버킷 권장. 서버(service_role)에서만 업로드/조회.
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('transfer-evidences', 'transfer-evidences', false)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================================
+-- v3 추가: 이자 관리 구독 (subscriptions / interest_records)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agreement_id    UUID NOT NULL REFERENCES agreements(id) ON DELETE CASCADE,
+  email           TEXT NOT NULL,
+  phone           TEXT,
+  status          TEXT NOT NULL DEFAULT 'active',  -- active / paused / cancelled
+  billing_day     INT NOT NULL,  -- 매월 몇 일에 이자 납부일 알림 (1~28)
+  interest_amount BIGINT NOT NULL,  -- 월 이자 금액 (원)
+  next_due_date   DATE NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  cancelled_at    TIMESTAMPTZ
+);
+
+CREATE TABLE IF NOT EXISTS interest_records (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subscription_id UUID NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,
+  due_date        DATE NOT NULL,
+  paid_date       DATE,
+  amount          BIGINT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'pending',  -- pending / paid / overdue
+  note            TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_subscriptions_agreement ON subscriptions (agreement_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_billing_day ON subscriptions (billing_day);
+CREATE INDEX IF NOT EXISTS idx_interest_records_subscription ON interest_records (subscription_id);
+
+ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE interest_records ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "deny_anon_subscription" ON subscriptions FOR ALL TO anon USING (false);
+CREATE POLICY "deny_anon_interest" ON interest_records FOR ALL TO anon USING (false);

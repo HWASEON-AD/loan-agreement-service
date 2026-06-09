@@ -3,6 +3,7 @@ import React from "react";
 import { LandingHero } from "@/components/LandingHero";
 import { ProcessSteps } from "@/components/ProcessSteps";
 import { PriceCard } from "@/components/PriceCard";
+import { SubscriptionPromo } from "@/components/SubscriptionPromo";
 import { TaxConsultSection } from "@/components/TaxConsultSection";
 import { Footer } from "@/components/Footer";
 
@@ -162,6 +163,7 @@ export default function HomePage() {
       <ProblemSection />
       <ProcessSteps />
       <PriceCard />
+      <SubscriptionPromo />
       <TaxConsultSection />
       <LegalEffectSection />
       <FaqSection />

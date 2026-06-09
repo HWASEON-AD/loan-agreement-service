@@ -2,6 +2,27 @@
 
 import { isMockMode, getBaseUrl, SERVICE_NAME } from "./config";
 import nodemailer, { type Transporter } from "nodemailer";
+import type {
+  Agreement,
+  ExpiryNotifyType,
+  InterestRecord,
+  Subscription,
+  TaxConsultation,
+} from "./types";
+
+// 관리자/세무사 알림 수신 주소
+const ADMIN_EMAIL = process.env.ADMIN_NOTIFY_EMAIL || "gt.min@hwaseon.com";
+
+// HTML escape (사용자 입력값을 이메일 본문에 안전하게 삽입)
+function escapeHtml(value: string): string {
+  return (value ?? "")
+    .toString()
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
 
 // 발신자 주소 — SMTP_USER 환경변수 우선, 미설정 시 기본 주소
 const FROM_EMAIL = process.env.SMTP_USER || "gt.min@hwaseon.com";
@@ -167,4 +188,217 @@ export async function sendCompletionEmail(
     </div>
   `;
   await send(to, `[${SERVICE_NAME}] 접수가 완료되었습니다`, html);
+}
+
+// KST(한국시간) 기준 "YYYY-MM-DD HH:mm" 포맷
+function formatKst(iso: string): string {
+  try {
+    const d = new Date(iso);
+    const kst = new Date(d.getTime() + 9 * 60 * 60 * 1000);
+    const ymd = kst.toISOString().slice(0, 10);
+    const hm = kst.toISOString().slice(11, 16);
+    return `${ymd} ${hm}`;
+  } catch {
+    return iso;
+  }
+}
+
+// 세무상담 신청 관리자 알림 이메일 (신청 즉시 gt.min@hwaseon.com 수신)
+export async function sendTaxConsultNotice(
+  consult: TaxConsultation
+): Promise<void> {
+  const html = `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;">
+      <h2 style="color:#1d4ed8;">[${SERVICE_NAME}] 세무상담 신청이 접수되었습니다</h2>
+      <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;">
+        <tr><td style="padding:6px 0;color:#64748b;width:90px;">이름</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(consult.name)}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748b;">연락처</td><td style="padding:6px 0;">${escapeHtml(consult.phone)}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748b;">이메일</td><td style="padding:6px 0;">${escapeHtml(consult.email)}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748b;">신청일시</td><td style="padding:6px 0;">${formatKst(consult.createdAt)} KST</td></tr>
+      </table>
+      <div style="margin:6px 0;color:#64748b;font-size:13px;">상담 내용</div>
+      <div style="background:#f1f5f9;border-radius:10px;padding:16px;white-space:pre-wrap;font-size:14px;color:#334155;">${escapeHtml(consult.content)}</div>
+      <p style="margin-top:20px;">
+        <a href="${getBaseUrl()}/admin/dashboard" style="display:inline-block;padding:10px 18px;background:#1d4ed8;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;">관리자 대시보드에서 확인하기</a>
+      </p>
+    </div>
+  `;
+  await send(
+    ADMIN_EMAIL,
+    `[${SERVICE_NAME}] 세무상담 신청이 접수되었습니다`,
+    html
+  );
+}
+
+// 세무사 일괄 발송 이메일 — 선택한 신청 목록을 HTML 테이블로 발송
+export async function sendTaxConsultListEmail(
+  consults: TaxConsultation[]
+): Promise<void> {
+  const dateStr = new Date(Date.now() + 9 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+
+  const rows = consults
+    .map((c) => {
+      const summary =
+        c.content.length > 40 ? `${c.content.slice(0, 40)}...` : c.content;
+      return `
+        <tr>
+          <td style="border:1px solid #e2e8f0;padding:8px;">${formatKst(c.createdAt).slice(5, 10)}</td>
+          <td style="border:1px solid #e2e8f0;padding:8px;">${escapeHtml(c.name)}</td>
+          <td style="border:1px solid #e2e8f0;padding:8px;">${escapeHtml(c.phone)}</td>
+          <td style="border:1px solid #e2e8f0;padding:8px;">${escapeHtml(c.email)}</td>
+          <td style="border:1px solid #e2e8f0;padding:8px;">${escapeHtml(summary)}</td>
+        </tr>`;
+    })
+    .join("");
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:720px;margin:0 auto;padding:24px;">
+      <h2 style="color:#1d4ed8;">[${SERVICE_NAME}] 세무상담 신청 목록 - ${dateStr} ${consults.length}건</h2>
+      <table style="width:100%;border-collapse:collapse;font-size:13px;margin-top:16px;">
+        <thead>
+          <tr style="background:#f1f5f9;">
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;">신청일</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;">이름</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;">연락처</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;">이메일</th>
+            <th style="border:1px solid #e2e8f0;padding:8px;text-align:left;">상담 내용 요약</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+  `;
+  await send(
+    ADMIN_EMAIL,
+    `[${SERVICE_NAME}] 세무상담 신청 목록 - ${dateStr} ${consults.length}건`,
+    html
+  );
+}
+
+// 만기 알림 이메일 — 대여자에게 갱신 링크와 함께 발송 (기획서 5-4)
+export async function sendExpiryNoticeEmail(
+  agreement: Agreement,
+  notifyType: ExpiryNotifyType
+): Promise<void> {
+  const renewLink = `${getBaseUrl()}/renew/${agreement.id}?token=${agreement.lenderSignToken}`;
+
+  // 발송 시점별 제목/문구 (기획서 5-4)
+  const variants: Record<
+    ExpiryNotifyType,
+    { subject: string; heading: string; message: string }
+  > = {
+    "30d": {
+      subject: `[${SERVICE_NAME}] 약정서 만기 1개월 전 알림`,
+      heading: "약정서 만기가 1개월 남았습니다",
+      message:
+        "대여 약정서의 만기가 약 30일 후로 다가왔습니다. 만기 이후에도 대여 관계를 유지하시려면 갱신(연장)을 준비해주세요. 만기된 약정서는 세무조사 시 대여가 아닌 증여로 오인될 수 있습니다.",
+    },
+    "7d": {
+      subject: `[${SERVICE_NAME}] 약정서 만기가 7일 남았습니다`,
+      heading: "약정서 만기가 7일 남았습니다",
+      message:
+        "대여 약정서의 만기가 7일 후로 임박했습니다. 지금 갱신하지 않으면 만기 이후 대여 사실 입증이 어려워질 수 있습니다. 아래 버튼으로 즉시 갱신을 진행해주세요.",
+    },
+    "0d": {
+      subject: `[${SERVICE_NAME}] 약정서 만기일입니다`,
+      heading: "오늘이 약정서 만기일입니다",
+      message:
+        "대여 약정서의 만기일이 오늘입니다. 대여 관계를 유지하시려면 지금 바로 갱신을 진행해주세요. 갱신 시 기존 정보가 자동으로 채워집니다.",
+    },
+  };
+
+  const v = variants[notifyType];
+  const html = `
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+      <h2 style="color:#1d4ed8;">${SERVICE_NAME} — ${v.heading}</h2>
+      <p>${escapeHtml(agreement.lender.name)}님, ${escapeHtml(agreement.borrower.name)}님과의 대여 약정서 만기가 다가오고 있습니다.</p>
+      <div style="background:#f1f5f9;border-radius:10px;padding:16px;margin:18px 0;font-size:14px;color:#334155;">
+        <p style="margin:0 0 6px 0;color:#64748b;font-size:13px;">만기일</p>
+        <p style="margin:0;font-size:18px;font-weight:bold;color:#1d4ed8;">${escapeHtml(agreement.endDate)}</p>
+      </div>
+      <p style="font-size:14px;color:#475569;">${v.message}</p>
+      <p style="margin-top:20px;">
+        <a href="${renewLink}" style="display:inline-block;padding:12px 22px;background:#1d4ed8;color:#fff;border-radius:8px;text-decoration:none;">약정서 갱신하기</a>
+      </p>
+      <p style="color:#94a3b8;font-size:12px;margin-top:24px;">
+        본 링크는 본인 확인용 토큰을 포함합니다. 타인에게 공유하지 마세요.<br/>
+        문의: ${ADMIN_EMAIL}
+      </p>
+    </div>
+  `;
+  await send(agreement.lender.email, v.subject, html);
+}
+
+// 천 단위 콤마 (이메일 본문용 — interest-calc 의존성 없이 간단 처리)
+function comma(n: number): string {
+  return n.toLocaleString("ko-KR");
+}
+
+// 이자 납부일 알림 이메일 — 구독자에게 발송
+// 약정서 정보, 이자 금액, 납부 계좌(대여자 이름), 납부 확인 링크 포함
+export async function sendInterestReminderEmail(
+  subscription: Subscription,
+  record: InterestRecord,
+  agreement: Agreement
+): Promise<void> {
+  // 납부 확인 링크 — 구독 대시보드 (lenderSignToken 으로 접근)
+  const dashboardUrl = `${getBaseUrl()}/subscribe/${subscription.agreementId}/dashboard?token=${agreement.lenderSignToken}`;
+  const [, month, day] = record.dueDate.split("-");
+
+  const html = `
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+      <h2 style="color:#1d4ed8;">${SERVICE_NAME} — 이자 납부일 알림</h2>
+      <p>${escapeHtml(agreement.borrower.name)}님, 오늘은 이자 납부일입니다.</p>
+      <div style="background:#f1f5f9;border-radius:10px;padding:16px;margin:18px 0;font-size:14px;color:#334155;">
+        <p style="margin:0 0 4px 0;color:#64748b;font-size:13px;">납부일</p>
+        <p style="margin:0 0 12px 0;font-size:16px;font-weight:bold;color:#1d4ed8;">${escapeHtml(record.dueDate)}</p>
+        <p style="margin:0 0 4px 0;color:#64748b;font-size:13px;">이번 달 이자 금액</p>
+        <p style="margin:0 0 12px 0;font-size:20px;font-weight:bold;color:#1d4ed8;">${comma(record.amount)}원</p>
+        <p style="margin:0 0 4px 0;color:#64748b;font-size:13px;">받는 사람(대여자)</p>
+        <p style="margin:0;font-size:15px;font-weight:600;color:#334155;">${escapeHtml(agreement.lender.name)}</p>
+      </div>
+      <p style="font-size:13px;color:#475569;">
+        이자를 정기적으로 납부하고 기록을 남기면, 가족 간 거래가 증여가 아닌
+        실제 대여임을 입증하는 강력한 증거가 됩니다.
+      </p>
+      <p style="margin-top:20px;">
+        <a href="${dashboardUrl}" style="display:inline-block;padding:12px 22px;background:#1d4ed8;color:#fff;border-radius:8px;text-decoration:none;">납부 확인하기</a>
+      </p>
+      <p style="color:#94a3b8;font-size:12px;margin-top:24px;">문의: ${ADMIN_EMAIL}</p>
+    </div>
+  `;
+  await send(
+    subscription.email,
+    `[${SERVICE_NAME}] 이자 납부일 알림 - ${Number(month)}월 ${Number(day)}일`,
+    html
+  );
+}
+
+// 구독 신청 완료 안내 이메일
+export async function sendSubscriptionConfirmEmail(
+  subscription: Subscription,
+  agreement: Agreement
+): Promise<void> {
+  const dashboardUrl = `${getBaseUrl()}/subscribe/${subscription.agreementId}/dashboard?token=${agreement.lenderSignToken}`;
+  const html = `
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+      <h2 style="color:#1d4ed8;">${SERVICE_NAME} — 이자 관리 구독 신청 완료</h2>
+      <p>이자 관리 구독이 정상적으로 신청되었습니다.</p>
+      <div style="background:#f1f5f9;border-radius:10px;padding:16px;margin:18px 0;font-size:14px;color:#334155;">
+        <p style="margin:0 0 8px 0;">매월 <b>${subscription.billingDay}일</b>에 이자 납부일 알림을 보내드립니다.</p>
+        <p style="margin:0;">월 이자 금액: <b>${comma(subscription.interestAmount)}원</b></p>
+      </div>
+      <p style="margin-top:20px;">
+        <a href="${dashboardUrl}" style="display:inline-block;padding:12px 22px;background:#1d4ed8;color:#fff;border-radius:8px;text-decoration:none;">이자 관리 현황 보기</a>
+      </p>
+      <p style="color:#94a3b8;font-size:12px;margin-top:24px;">문의: ${ADMIN_EMAIL}</p>
+    </div>
+  `;
+  await send(
+    subscription.email,
+    `[${SERVICE_NAME}] 이자 관리 구독이 신청되었습니다`,
+    html
+  );
 }

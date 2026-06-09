@@ -4,9 +4,15 @@
 
 import type {
   Agreement,
+  ExpiryNotification,
+  ExpiryNotifyType,
+  InterestRecord,
   Order,
   OtpCode,
   SignatureRecord,
+  Subscription,
+  TaxConsultation,
+  TransferEvidence,
 } from "./types";
 
 // Next.js dev 환경의 HMR 로 모듈이 재평가되어도 같은 스토어를 공유하도록
@@ -17,6 +23,11 @@ interface MockStore {
   orders: Map<string, Order>;
   ordersByAgreement: Map<string, string>; // agreementId -> orderId
   signatures: SignatureRecord[];
+  taxConsultations: Map<string, TaxConsultation>;
+  expiryNotifications: ExpiryNotification[];
+  transferEvidences: TransferEvidence[];
+  subscriptions: Map<string, Subscription>;
+  interestRecords: InterestRecord[];
 }
 
 declare global {
@@ -33,6 +44,11 @@ function getStore(): MockStore {
       orders: new Map(),
       ordersByAgreement: new Map(),
       signatures: [],
+      taxConsultations: new Map(),
+      expiryNotifications: [],
+      transferEvidences: [],
+      subscriptions: new Map(),
+      interestRecords: [],
     };
   }
   return globalThis.__LOAN_MOCK_STORE__;
@@ -180,6 +196,135 @@ export function getSignaturesByAgreement(
   return getStore().signatures.filter((s) => s.agreementId === agreementId);
 }
 
+// ---------- 세무상담 (tax_consultations) ----------
+
+// 세무상담 신청 저장
+export function createTaxConsultation(data: TaxConsultation): void {
+  getStore().taxConsultations.set(data.id, data);
+}
+
+// 세무상담 신청 전체 조회 (최신순)
+export function getTaxConsultations(): TaxConsultation[] {
+  return Array.from(getStore().taxConsultations.values()).sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt)
+  );
+}
+
+// ---------- 만기 알림 (expiry_notifications) ----------
+
+// 특정 약정서에 대해 이미 발송한 알림 타입 목록
+export function getSentExpiryNotifyTypes(
+  agreementId: string
+): ExpiryNotifyType[] {
+  return getStore()
+    .expiryNotifications.filter((n) => n.agreementId === agreementId)
+    .map((n) => n.notifyType);
+}
+
+// 만기 알림 발송 기록 저장
+export function recordExpiryNotification(record: ExpiryNotification): void {
+  getStore().expiryNotifications.push(record);
+}
+
+// 만기 알림 기록 전체 조회 (최신순)
+export function listExpiryNotifications(): ExpiryNotification[] {
+  return [...getStore().expiryNotifications].sort((a, b) =>
+    b.sentAt.localeCompare(a.sentAt)
+  );
+}
+
+// ---------- 이체 증빙 (transfer_evidences) ----------
+
+// 이체 증빙 추가
+export function createTransferEvidence(data: TransferEvidence): void {
+  getStore().transferEvidences.push(data);
+}
+
+// 특정 약정서의 이체 증빙 목록 (오래된 순)
+export function getTransferEvidences(agreementId: string): TransferEvidence[] {
+  return getStore()
+    .transferEvidences.filter((e) => e.agreementId === agreementId)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+// ---------- 이자 관리 구독 (subscriptions) ----------
+
+// 구독 저장
+export function saveSubscription(sub: Subscription): void {
+  getStore().subscriptions.set(sub.id, sub);
+}
+
+// 구독 단건 조회
+export function getSubscription(id: string): Subscription | undefined {
+  return getStore().subscriptions.get(id);
+}
+
+// 약정서 ID 로 구독 조회 (최신 1건)
+export function getSubscriptionByAgreement(
+  agreementId: string
+): Subscription | undefined {
+  const list = Array.from(getStore().subscriptions.values())
+    .filter((s) => s.agreementId === agreementId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return list[0];
+}
+
+// 구독 갱신
+export function updateSubscription(
+  id: string,
+  patch: Partial<Subscription>
+): Subscription | undefined {
+  const store = getStore();
+  const existing = store.subscriptions.get(id);
+  if (!existing) return undefined;
+  const updated: Subscription = { ...existing, ...patch };
+  store.subscriptions.set(id, updated);
+  return updated;
+}
+
+// 전체 구독 목록 (최신순)
+export function listSubscriptions(): Subscription[] {
+  return Array.from(getStore().subscriptions.values()).sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt)
+  );
+}
+
+// 특정 billing_day(매월 납부일)의 active 구독 목록
+export function getActiveSubscriptionsByBillingDay(
+  billingDay: number
+): Subscription[] {
+  return Array.from(getStore().subscriptions.values()).filter(
+    (s) => s.status === "active" && s.billingDay === billingDay
+  );
+}
+
+// ---------- 이자 납부 기록 (interest_records) ----------
+
+// 이자 납부 기록 추가
+export function createInterestRecord(record: InterestRecord): void {
+  getStore().interestRecords.push(record);
+}
+
+// 특정 구독의 이자 납부 기록 목록 (납부일 순)
+export function getInterestRecords(subscriptionId: string): InterestRecord[] {
+  return getStore()
+    .interestRecords.filter((r) => r.subscriptionId === subscriptionId)
+    .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+}
+
+// 이자 납부 기록 갱신
+export function updateInterestRecord(
+  id: string,
+  patch: Partial<InterestRecord>
+): InterestRecord | undefined {
+  const store = getStore();
+  const idx = store.interestRecords.findIndex((r) => r.id === id);
+  if (idx === -1) return undefined;
+  const updated: InterestRecord = { ...store.interestRecords[idx], ...patch };
+  store.interestRecords[idx] = updated;
+  return updated;
+}
+
 // ---------- Mock 시드 데이터 (데모/대시보드 시연용) ----------
 
 // KST(한국시간) 기준 오늘 날짜 ISO 문자열 생성 (todayCount 검증용)
@@ -207,7 +352,11 @@ function daysAgoIso(days: number, hour = 10): string {
 // Mock 시드 약정서 5건 생성 (상태 다양화)
 function buildSeedAgreements(): Agreement[] {
   const today = kstTodayDate();
-  return [
+  // 이체 증빙 필드(v3) 기본값을 일괄 주입하기 위해 Omit 후 map 으로 보강
+  const seeds: Omit<
+    Agreement,
+    "transferConfirmed" | "transferDate" | "transferNote"
+  >[] = [
     // 1) 서명완료 (오늘 생성)
     {
       id: "mock-001-0000-0000-0000-000000000001",
@@ -236,6 +385,7 @@ function buildSeedAgreements(): Agreement[] {
       lenderSignToken: "mock-lender-token-001",
       borrowerSignToken: "mock-borrower-token-001",
       borrowerTokenExpiresAt: null,
+      parentAgreementId: null,
       pdfBase64: null,
       documentHash: "seedhash001abcdef",
       lenderSigned: true,
@@ -271,6 +421,7 @@ function buildSeedAgreements(): Agreement[] {
       lenderSignToken: "mock-lender-token-002",
       borrowerSignToken: "mock-borrower-token-002",
       borrowerTokenExpiresAt: null,
+      parentAgreementId: null,
       pdfBase64: null,
       documentHash: "seedhash002abcdef",
       lenderSigned: true,
@@ -306,6 +457,7 @@ function buildSeedAgreements(): Agreement[] {
       lenderSignToken: "mock-lender-token-003",
       borrowerSignToken: "mock-borrower-token-003",
       borrowerTokenExpiresAt: null,
+      parentAgreementId: null,
       pdfBase64: null,
       documentHash: "seedhash003abcdef",
       lenderSigned: true,
@@ -341,6 +493,7 @@ function buildSeedAgreements(): Agreement[] {
       lenderSignToken: "mock-lender-token-004",
       borrowerSignToken: "mock-borrower-token-004",
       borrowerTokenExpiresAt: null,
+      parentAgreementId: null,
       pdfBase64: null,
       documentHash: null,
       lenderSigned: false,
@@ -376,6 +529,7 @@ function buildSeedAgreements(): Agreement[] {
       lenderSignToken: "mock-lender-token-005",
       borrowerSignToken: "mock-borrower-token-005",
       borrowerTokenExpiresAt: null,
+      parentAgreementId: null,
       pdfBase64: null,
       documentHash: "seedhash005abcdef",
       lenderSigned: false,
@@ -384,6 +538,13 @@ function buildSeedAgreements(): Agreement[] {
       updatedAt: daysAgoIso(28, 10),
     },
   ];
+  // v3 이체 증빙 기본값 보강
+  return seeds.map((s) => ({
+    ...s,
+    transferConfirmed: false,
+    transferDate: null,
+    transferNote: null,
+  }));
 }
 
 // Mock 시드 서명 감사로그 생성

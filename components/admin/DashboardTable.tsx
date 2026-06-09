@@ -33,13 +33,53 @@ interface DashboardResponse {
   stats: DashboardStatsData;
 }
 
-type FilterKey = "all" | "pending" | "signed";
+type FilterKey = "all" | "pending" | "signed" | "expiring";
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "전체" },
   { key: "pending", label: "서명대기" },
   { key: "signed", label: "서명완료" },
+  { key: "expiring", label: "만기임박" },
 ];
+
+// KST 오늘 기준 end_date 까지 남은 일수 (end - today)
+function daysUntil(endDate: string): number {
+  if (!endDate) return Number.POSITIVE_INFINITY;
+  const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  const today = new Date(`${todayStr}T00:00:00.000Z`).getTime();
+  const end = new Date(`${endDate}T00:00:00.000Z`).getTime();
+  return Math.round((end - today) / (24 * 60 * 60 * 1000));
+}
+
+// 만기임박 여부 — 완료(서명완료) 상태 + 30일 이내(경과 포함)
+function isExpiring(r: { dashboardStatus: DashboardStatus; endDate: string }): boolean {
+  if (r.dashboardStatus !== "signed") return false;
+  return daysUntil(r.endDate) <= 30;
+}
+
+// D-day 뱃지 (만기임박 탭 전용)
+function ExpiryBadge({ endDate }: { endDate: string }) {
+  const d = daysUntil(endDate);
+  let label: string;
+  let color: string;
+  if (d <= 0) {
+    label = d === 0 ? "D-DAY" : `만기 ${-d}일 경과`;
+    color = "bg-red-100 text-red-700";
+  } else if (d <= 7) {
+    label = `D-${d}`;
+    color = "bg-orange-100 text-orange-700";
+  } else {
+    label = `D-${d}`;
+    color = "bg-yellow-100 text-yellow-700";
+  }
+  return (
+    <span className={`inline-block rounded-full px-2.5 py-1 text-xs font-medium ${color}`}>
+      {label}
+    </span>
+  );
+}
 
 export function DashboardTable() {
   const router = useRouter();
@@ -64,7 +104,9 @@ export function DashboardTable() {
       setLoading(true);
       setError("");
       try {
-        const res = await fetch(`/api/admin/agreements?status=${status}`, {
+        // 만기임박은 서버 필터가 없으므로 전체를 받아 클라이언트에서 필터링
+        const apiStatus = status === "expiring" ? "all" : status;
+        const res = await fetch(`/api/admin/agreements?status=${apiStatus}`, {
           cache: "no-store",
           signal: controller.signal,
         });
@@ -76,7 +118,13 @@ export function DashboardTable() {
         }
         const data: DashboardResponse & { error?: string } = await res.json();
         if (!res.ok) throw new Error(data.error || "조회 실패");
-        setAgreements(data.agreements);
+        const rows =
+          status === "expiring"
+            ? data.agreements
+                .filter(isExpiring)
+                .sort((a, b) => daysUntil(a.endDate) - daysUntil(b.endDate))
+            : data.agreements;
+        setAgreements(rows);
         setStats(data.stats);
       } catch (e) {
         if ((e as Error).name === "AbortError") return; // 취소는 무시
@@ -98,6 +146,8 @@ export function DashboardTable() {
     all: stats ? stats.total : null,
     pending: stats ? stats.pendingCount : null,
     signed: stats ? stats.signedCount : null,
+    // 만기임박은 현재 탭에서만 정확히 계산되므로, 활성 시 표시
+    expiring: filter === "expiring" ? agreements.length : null,
   };
 
   return (
@@ -198,7 +248,11 @@ export function DashboardTable() {
                     {formatNumber(r.amount)}원
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <StatusBadge status={r.dashboardStatus} />
+                    {filter === "expiring" ? (
+                      <ExpiryBadge endDate={r.endDate} />
+                    ) : (
+                      <StatusBadge status={r.dashboardStatus} />
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <button
@@ -235,7 +289,11 @@ export function DashboardTable() {
                 <span className="text-xs text-slate-400">
                   {r.createdAt.slice(0, 10)}
                 </span>
-                <StatusBadge status={r.dashboardStatus} size="sm" />
+                {filter === "expiring" ? (
+                  <ExpiryBadge endDate={r.endDate} />
+                ) : (
+                  <StatusBadge status={r.dashboardStatus} size="sm" />
+                )}
               </div>
               <p className="text-sm font-medium text-slate-800">
                 {r.lenderName}

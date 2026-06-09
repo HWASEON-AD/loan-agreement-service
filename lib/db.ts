@@ -7,10 +7,20 @@ import { getSupabaseAdmin } from "./supabase";
 import * as mock from "./mock-store";
 import type {
   Agreement,
+  ExpiryNotification,
+  ExpiryNotifyType,
+  InterestRecord,
+  InterestRecordStatus,
   Order,
   OtpCode,
   SignatureRecord,
   SignerType,
+  Subscription,
+  SubscriptionStatus,
+  TaxConsultation,
+  TaxConsultStatus,
+  TransferEvidence,
+  TransferUploader,
 } from "./types";
 
 // ─────────────────────────────────────────────
@@ -34,10 +44,14 @@ function rowToAgreement(row: any): Agreement {
     lenderSignToken: row.lender_sign_token,
     borrowerSignToken: row.borrower_sign_token,
     borrowerTokenExpiresAt: row.borrower_token_expires_at ?? null,
+    parentAgreementId: row.parent_agreement_id ?? null,
     pdfBase64: row.pdf_base64 ?? null,
     documentHash: row.document_hash ?? null,
     lenderSigned: row.lender_signed,
     borrowerSigned: row.borrower_signed,
+    transferConfirmed: row.transfer_confirmed ?? false,
+    transferDate: row.transfer_date ?? null,
+    transferNote: row.transfer_note ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -118,10 +132,14 @@ export async function saveAgreement(agreement: Agreement): Promise<void> {
     lender_sign_token: agreement.lenderSignToken,
     borrower_sign_token: agreement.borrowerSignToken,
     borrower_token_expires_at: agreement.borrowerTokenExpiresAt,
+    parent_agreement_id: agreement.parentAgreementId,
     pdf_base64: agreement.pdfBase64,
     document_hash: agreement.documentHash,
     lender_signed: agreement.lenderSigned,
     borrower_signed: agreement.borrowerSigned,
+    transfer_confirmed: agreement.transferConfirmed,
+    transfer_date: agreement.transferDate,
+    transfer_note: agreement.transferNote,
     created_at: agreement.createdAt,
     updated_at: agreement.updatedAt,
   });
@@ -176,6 +194,12 @@ export async function updateAgreement(
   if (patch.pdfBase64 !== undefined) dbPatch.pdf_base64 = patch.pdfBase64;
   if (patch.borrowerTokenExpiresAt !== undefined)
     dbPatch.borrower_token_expires_at = patch.borrowerTokenExpiresAt;
+  if (patch.transferConfirmed !== undefined)
+    dbPatch.transfer_confirmed = patch.transferConfirmed;
+  if (patch.transferDate !== undefined)
+    dbPatch.transfer_date = patch.transferDate;
+  if (patch.transferNote !== undefined)
+    dbPatch.transfer_note = patch.transferNote;
 
   const { data, error } = await sb
     .from("agreements")
@@ -434,4 +458,506 @@ export async function getSignaturesByAgreement(
     .order("signed_at", { ascending: true });
   if (error || !data) return [];
   return data.map(rowToSignature);
+}
+
+// ─────────────────────────────────────────────
+// 세무상담 (tax_consultations)
+// ─────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToTaxConsultation(row: any): TaxConsultation {
+  return {
+    id: row.id,
+    name: row.name,
+    phone: row.phone,
+    email: row.email,
+    content: row.content,
+    status: row.status as TaxConsultStatus,
+    contactedAt: row.contacted_at ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+// 세무상담 신청 저장 (신규 생성)
+export async function createTaxConsultation(
+  data: TaxConsultation
+): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) {
+    mock.createTaxConsultation(data);
+    return;
+  }
+  const { error } = await sb.from("tax_consultations").insert({
+    id: data.id,
+    name: data.name,
+    phone: data.phone,
+    email: data.email,
+    content: data.content,
+    status: data.status,
+    contacted_at: data.contactedAt,
+    created_at: data.createdAt,
+  });
+  if (error) throw new Error(`[db] createTaxConsultation: ${error.message}`);
+}
+
+// 세무상담 신청 전체 조회 (최신순)
+export async function getTaxConsultations(): Promise<TaxConsultation[]> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return mock.getTaxConsultations();
+
+  const { data, error } = await sb
+    .from("tax_consultations")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data.map(rowToTaxConsultation);
+}
+
+// ─────────────────────────────────────────────
+// 갱신(재신청) + 만기 알림
+// ─────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToExpiryNotification(row: any): ExpiryNotification {
+  return {
+    id: row.id,
+    agreementId: row.agreement_id,
+    notifyType: row.notify_type as ExpiryNotifyType,
+    sentAt: row.sent_at,
+    emailTo: row.email_to,
+  };
+}
+
+// 만기 임박 약정서 조회
+// status IN ('paid','processing','completed') 인 약정서 중
+// end_date 가 오늘로부터 maxDaysAhead 일 이내(또는 이미 만기 경과)인 건을 반환한다.
+export async function getExpiringAgreements(
+  maxDaysAhead = 30
+): Promise<Agreement[]> {
+  const all = await listAgreements();
+  const targetStatuses = new Set(["paid", "processing", "completed"]);
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const limit = new Date(today.getTime() + maxDaysAhead * 24 * 60 * 60 * 1000)
+    .toISOString()
+    .slice(0, 10);
+  return all.filter((a) => {
+    if (!targetStatuses.has(a.status)) return false;
+    if (!a.endDate) return false;
+    // end_date 가 limit 이하 (만기 경과분 포함). 단 너무 오래 지난 건도 포함되므로
+    // 호출부(크론)에서 정확한 D-day 로 다시 필터한다.
+    return a.endDate <= limit || a.endDate >= todayStr;
+  });
+}
+
+// 특정 약정서에 대해 이미 발송한 알림 타입 목록 조회
+export async function getSentExpiryNotifyTypes(
+  agreementId: string
+): Promise<ExpiryNotifyType[]> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return mock.getSentExpiryNotifyTypes(agreementId);
+
+  const { data, error } = await sb
+    .from("expiry_notifications")
+    .select("notify_type")
+    .eq("agreement_id", agreementId);
+  if (error || !data) return [];
+  return data.map((r) => r.notify_type as ExpiryNotifyType);
+}
+
+// 만기 알림 발송 기록 저장
+export async function recordExpiryNotification(
+  record: ExpiryNotification
+): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) {
+    mock.recordExpiryNotification(record);
+    return;
+  }
+  const { error } = await sb.from("expiry_notifications").insert({
+    id: record.id,
+    agreement_id: record.agreementId,
+    notify_type: record.notifyType,
+    sent_at: record.sentAt,
+    email_to: record.emailTo,
+  });
+  if (error)
+    throw new Error(`[db] recordExpiryNotification: ${error.message}`);
+}
+
+// 만기 알림 기록 조회 (디버그/관리용, 미사용 시 제거 가능)
+export async function listExpiryNotifications(): Promise<ExpiryNotification[]> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return mock.listExpiryNotifications();
+
+  const { data, error } = await sb
+    .from("expiry_notifications")
+    .select("*")
+    .order("sent_at", { ascending: false });
+  if (error || !data) return [];
+  return data.map(rowToExpiryNotification);
+}
+
+// 갱신 약정서 생성 — 원본을 복사하고 금융 정보만 교체한 신규 약정서를 반환한다.
+// 저장(saveAgreement) 은 호출부에서 수행한다.
+export async function createRenewalAgreement(
+  original: Agreement,
+  data: {
+    amount: number;
+    interestRate: number;
+    startDate: string;
+    endDate: string;
+    repaymentMethod: Agreement["repaymentMethod"];
+  },
+  newId: string,
+  newLenderToken: string,
+  newBorrowerToken: string
+): Promise<Agreement> {
+  const now = new Date().toISOString();
+  const borrowerExpires = new Date(
+    Date.now() + 7 * 24 * 60 * 60 * 1000
+  ).toISOString();
+
+  const renewal: Agreement = {
+    id: newId,
+    status: "draft",
+    amount: data.amount,
+    interestRate: data.interestRate,
+    startDate: data.startDate,
+    endDate: data.endDate,
+    repaymentMethod: data.repaymentMethod,
+    interestDay: original.interestDay,
+    lender: original.lender,
+    borrower: original.borrower,
+    familyRelation: original.familyRelation,
+    lenderSignToken: newLenderToken,
+    borrowerSignToken: newBorrowerToken,
+    borrowerTokenExpiresAt: borrowerExpires,
+    parentAgreementId: original.id,
+    pdfBase64: null,
+    documentHash: null,
+    lenderSigned: false,
+    borrowerSigned: false,
+    transferConfirmed: false,
+    transferDate: null,
+    transferNote: null,
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  await saveAgreement(renewal);
+  return renewal;
+}
+
+// ─────────────────────────────────────────────
+// 이체 증빙 (transfer_evidences) — v3
+// ─────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToTransferEvidence(row: any): TransferEvidence {
+  return {
+    id: row.id,
+    agreementId: row.agreement_id,
+    fileName: row.file_name,
+    fileUrl: row.file_url,
+    fileSize: row.file_size ?? null,
+    uploadedBy: (row.uploaded_by ?? "lender") as TransferUploader,
+    createdAt: row.created_at,
+  };
+}
+
+// 이체 증빙 1건 저장
+export async function createTransferEvidence(
+  data: TransferEvidence
+): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) {
+    mock.createTransferEvidence(data);
+    return;
+  }
+  const { error } = await sb.from("transfer_evidences").insert({
+    id: data.id,
+    agreement_id: data.agreementId,
+    file_name: data.fileName,
+    file_url: data.fileUrl,
+    file_size: data.fileSize,
+    uploaded_by: data.uploadedBy,
+    created_at: data.createdAt,
+  });
+  if (error) throw new Error(`[db] createTransferEvidence: ${error.message}`);
+}
+
+// 특정 약정서의 이체 증빙 목록 (오래된 순)
+export async function getTransferEvidences(
+  agreementId: string
+): Promise<TransferEvidence[]> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return mock.getTransferEvidences(agreementId);
+
+  const { data, error } = await sb
+    .from("transfer_evidences")
+    .select("*")
+    .eq("agreement_id", agreementId)
+    .order("created_at", { ascending: true });
+  if (error || !data) return [];
+  return data.map(rowToTransferEvidence);
+}
+
+// 약정서 이체 확인 상태 갱신 (transfer_confirmed=true + transfer_date)
+export async function updateAgreementTransferStatus(
+  agreementId: string,
+  date: string
+): Promise<Agreement | undefined> {
+  return updateAgreement(agreementId, {
+    transferConfirmed: true,
+    transferDate: date,
+  });
+}
+
+// Supabase Storage 업로드 — 비공개 버킷에 파일 저장 후 서명 URL(또는 경로) 반환
+// Mock 모드/키 없음: data URL(base64) 을 그대로 반환하여 메모리 표시에 사용한다.
+export async function uploadTransferFile(
+  agreementId: string,
+  fileName: string,
+  bytes: Uint8Array,
+  contentType: string
+): Promise<string> {
+  const sb = getSupabaseAdmin();
+  const path = `${agreementId}/${Date.now()}_${fileName}`;
+
+  if (!sb) {
+    // Mock: base64 data URL 로 보관 (서버 재시작 시 사라짐)
+    const base64 = Buffer.from(bytes).toString("base64");
+    return `data:${contentType};base64,${base64}`;
+  }
+
+  const { error } = await sb.storage
+    .from("transfer-evidences")
+    .upload(path, bytes, { contentType, upsert: false });
+  if (error) throw new Error(`[db] uploadTransferFile: ${error.message}`);
+
+  // 비공개 버킷 → 7일 유효 서명 URL 발급. 실패 시 경로 문자열 폴백.
+  const { data: signed } = await sb.storage
+    .from("transfer-evidences")
+    .createSignedUrl(path, 60 * 60 * 24 * 7);
+  return signed?.signedUrl ?? path;
+}
+
+// ─────────────────────────────────────────────
+// 이자 관리 구독 (subscriptions) — v3
+// ─────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToSubscription(row: any): Subscription {
+  return {
+    id: row.id,
+    agreementId: row.agreement_id,
+    email: row.email,
+    phone: row.phone ?? null,
+    status: row.status as SubscriptionStatus,
+    billingDay: row.billing_day,
+    interestAmount: Number(row.interest_amount),
+    nextDueDate: row.next_due_date,
+    createdAt: row.created_at,
+    cancelledAt: row.cancelled_at ?? null,
+  };
+}
+
+// 구독 저장 (신규/갱신 공통)
+export async function saveSubscription(sub: Subscription): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) {
+    mock.saveSubscription(sub);
+    return;
+  }
+  const { error } = await sb.from("subscriptions").upsert({
+    id: sub.id,
+    agreement_id: sub.agreementId,
+    email: sub.email,
+    phone: sub.phone,
+    status: sub.status,
+    billing_day: sub.billingDay,
+    interest_amount: sub.interestAmount,
+    next_due_date: sub.nextDueDate,
+    created_at: sub.createdAt,
+    cancelled_at: sub.cancelledAt,
+  });
+  if (error) throw new Error(`[db] saveSubscription: ${error.message}`);
+}
+
+// 구독 단건 조회
+export async function getSubscription(
+  id: string
+): Promise<Subscription | undefined> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return mock.getSubscription(id);
+
+  const { data, error } = await sb
+    .from("subscriptions")
+    .select("*")
+    .eq("id", id)
+    .single();
+  if (error || !data) return undefined;
+  return rowToSubscription(data);
+}
+
+// 약정서 ID 로 구독 조회 (최신 1건)
+export async function getSubscriptionByAgreement(
+  agreementId: string
+): Promise<Subscription | undefined> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return mock.getSubscriptionByAgreement(agreementId);
+
+  const { data, error } = await sb
+    .from("subscriptions")
+    .select("*")
+    .eq("agreement_id", agreementId)
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error || !data) return undefined;
+  return rowToSubscription(data);
+}
+
+// 구독 갱신
+export async function updateSubscription(
+  id: string,
+  patch: Partial<Subscription>
+): Promise<Subscription | undefined> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return mock.updateSubscription(id, patch);
+
+  const dbPatch: Record<string, unknown> = {};
+  if (patch.status !== undefined) dbPatch.status = patch.status;
+  if (patch.nextDueDate !== undefined) dbPatch.next_due_date = patch.nextDueDate;
+  if (patch.cancelledAt !== undefined) dbPatch.cancelled_at = patch.cancelledAt;
+  if (patch.billingDay !== undefined) dbPatch.billing_day = patch.billingDay;
+  if (patch.interestAmount !== undefined)
+    dbPatch.interest_amount = patch.interestAmount;
+
+  const { data, error } = await sb
+    .from("subscriptions")
+    .update(dbPatch)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error || !data) return undefined;
+  return rowToSubscription(data);
+}
+
+// 전체 구독 목록 (최신순)
+export async function listSubscriptions(): Promise<Subscription[]> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return mock.listSubscriptions();
+
+  const { data, error } = await sb
+    .from("subscriptions")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (error || !data) return [];
+  return data.map(rowToSubscription);
+}
+
+// 특정 billing_day(매월 납부일)에 해당하는 active 구독 목록 (크론용)
+export async function getActiveSubscriptionsByBillingDay(
+  billingDay: number
+): Promise<Subscription[]> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return mock.getActiveSubscriptionsByBillingDay(billingDay);
+
+  const { data, error } = await sb
+    .from("subscriptions")
+    .select("*")
+    .eq("status", "active")
+    .eq("billing_day", billingDay);
+  if (error || !data) return [];
+  return data.map(rowToSubscription);
+}
+
+// ─────────────────────────────────────────────
+// 이자 납부 기록 (interest_records) — v3
+// ─────────────────────────────────────────────
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToInterestRecord(row: any): InterestRecord {
+  return {
+    id: row.id,
+    subscriptionId: row.subscription_id,
+    dueDate: row.due_date,
+    paidDate: row.paid_date ?? null,
+    amount: Number(row.amount),
+    status: row.status as InterestRecordStatus,
+    note: row.note ?? null,
+    createdAt: row.created_at,
+  };
+}
+
+// 이자 납부 기록 저장
+export async function createInterestRecord(
+  record: InterestRecord
+): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) {
+    mock.createInterestRecord(record);
+    return;
+  }
+  const { error } = await sb.from("interest_records").insert({
+    id: record.id,
+    subscription_id: record.subscriptionId,
+    due_date: record.dueDate,
+    paid_date: record.paidDate,
+    amount: record.amount,
+    status: record.status,
+    note: record.note,
+    created_at: record.createdAt,
+  });
+  if (error) throw new Error(`[db] createInterestRecord: ${error.message}`);
+}
+
+// 특정 구독의 이자 납부 기록 목록 (납부일 순)
+export async function getInterestRecords(
+  subscriptionId: string
+): Promise<InterestRecord[]> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return mock.getInterestRecords(subscriptionId);
+
+  const { data, error } = await sb
+    .from("interest_records")
+    .select("*")
+    .eq("subscription_id", subscriptionId)
+    .order("due_date", { ascending: true });
+  if (error || !data) return [];
+  return data.map(rowToInterestRecord);
+}
+
+// 특정 구독·납부일의 기록 존재 여부 (중복 방지용)
+export async function hasInterestRecordForDue(
+  subscriptionId: string,
+  dueDate: string
+): Promise<boolean> {
+  const records = await getInterestRecords(subscriptionId);
+  return records.some((r) => r.dueDate === dueDate);
+}
+
+// 이자 납부 기록 갱신
+export async function updateInterestRecord(
+  id: string,
+  patch: Partial<InterestRecord>
+): Promise<InterestRecord | undefined> {
+  const sb = getSupabaseAdmin();
+  if (!sb) return mock.updateInterestRecord(id, patch);
+
+  const dbPatch: Record<string, unknown> = {};
+  if (patch.status !== undefined) dbPatch.status = patch.status;
+  if (patch.paidDate !== undefined) dbPatch.paid_date = patch.paidDate;
+  if (patch.note !== undefined) dbPatch.note = patch.note;
+
+  const { data, error } = await sb
+    .from("interest_records")
+    .update(dbPatch)
+    .eq("id", id)
+    .select("*")
+    .single();
+  if (error || !data) return undefined;
+  return rowToInterestRecord(data);
 }
