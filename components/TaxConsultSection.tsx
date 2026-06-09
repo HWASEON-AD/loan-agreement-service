@@ -25,12 +25,12 @@ export function TaxConsultSection() {
         {/* 전문가 카드 */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:flex">
 
-          {/* 세무사 사진 — 전체 표시 */}
-          <div className="shrink-0 bg-slate-100 sm:w-52">
+          {/* 세무사 사진 — 카드 높이에 맞춰 하단 크롭 */}
+          <div className="relative shrink-0 overflow-hidden bg-slate-100 sm:w-52">
             <img
               src="/images/tax-consultant.png"
               alt="협력 세무 전문가"
-              className="w-full"
+              className="absolute inset-0 h-full w-full object-cover object-top"
             />
           </div>
 
@@ -50,7 +50,6 @@ export function TaxConsultSection() {
                 { badge: null, text: "중부지방국세청 조사1국 (세무조사 전담) 2회 근무" },
                 { badge: null, text: "중부청 법인세과·송무과 전문" },
                 { badge: null, text: "상주·광명·용산 세무서장 역임" },
-                { badge: null, text: "관악·남산·서대문·광화문 세무서 근무" },
               ].map((item) => (
                 <li key={item.text} className="flex items-start gap-2 text-sm text-slate-700">
                   <span className="mt-0.5 shrink-0 text-brand-600">✓</span>
@@ -66,21 +65,18 @@ export function TaxConsultSection() {
               ))}
             </ul>
 
-            <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+            <div className="mt-7">
               <Link
                 href="http://pf.kakao.com/_xoNxkxl/chat"
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-700 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-800 sm:w-auto"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-brand-700 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-800"
               >
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a5.969 5.969 0 0 1-.474-.065 4.48 4.48 0 0 0 .978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
                 </svg>
                 세무 상담 신청하기
               </Link>
-              <div className="flex items-center text-xs text-slate-400">
-                초기 상담 무료 · 카카오 채널 연결
-              </div>
             </div>
 
             {/* 이메일 상담 신청 폼 (접이식) */}
