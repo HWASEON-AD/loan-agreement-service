@@ -23,14 +23,14 @@ export function TaxConsultSection() {
         </div>
 
         {/* 전문가 카드 */}
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:grid sm:grid-cols-[13rem_1fr]">
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:flex">
 
-          {/* 세무사 사진 */}
-          <div className="relative h-64 sm:h-auto">
+          {/* 세무사 사진 — 전체 표시 */}
+          <div className="shrink-0 bg-slate-100 sm:w-52">
             <img
               src="/images/tax-consultant.png"
               alt="협력 세무 전문가"
-              className="absolute inset-0 h-full w-full object-cover object-top"
+              className="w-full"
             />
           </div>
 
@@ -40,12 +40,7 @@ export function TaxConsultSection() {
               협력 세무 전문가
             </div>
             <h3 className="text-xl font-bold text-slate-900">전직 용산세무서장 출신</h3>
-            <p className="mt-1 text-sm font-medium text-slate-700">
-              국세청 30년 경력의 세무전문가입니다.<br />
-              조사, 상속, 증여를 전문으로 하고 있습니다.<br />
-              <span className="text-brand-700 font-semibold">세무는 아이디어 싸움입니다.</span>
-            </p>
-            <p className="mt-0.5 text-xs text-slate-400">국립세무대학 4기</p>
+            <p className="mt-0.5 text-sm text-slate-500">국립세무대학 4기 · 국세청 30년 경력</p>
 
             {/* 주요 약력 */}
             <ul className="mt-5 space-y-2">
@@ -93,19 +88,8 @@ export function TaxConsultSection() {
           </div>
         </div>
 
-        {/* 수수료 없음 안내 */}
-        <div className="mt-6 flex items-center justify-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-5 py-3 text-sm text-brand-800">
-          <svg className="h-4 w-4 shrink-0 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-          </svg>
-          <span>
-            <strong>초기 상담 시 어떠한 수수료도 받지 않습니다.</strong>
-            &nbsp;상담 후 진행 여부는 고객님이 결정하세요.
-          </span>
-        </div>
-
         {/* 하단 키워드 뱃지 */}
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
+        <div className="mt-8 flex flex-wrap justify-center gap-2">
           {["가족간 차용증 세무 검토", "증여세 절세 전략", "자금조달계획서 세무 리스크", "세무조사 대응", "법인세·소득세 상담"].map((tag) => (
             <span
               key={tag}
