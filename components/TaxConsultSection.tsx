@@ -25,16 +25,13 @@ export function TaxConsultSection() {
         {/* 전문가 카드 */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:flex">
 
-          {/* 사진 영역 — 사진 받으면 img 태그로 교체 */}
-          <div className="flex shrink-0 items-center justify-center bg-slate-100 sm:w-52">
-            <div className="flex h-52 w-full items-center justify-center sm:h-full">
-              <div className="flex flex-col items-center gap-3 text-slate-400">
-                <svg className="h-20 w-20" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                </svg>
-                <span className="text-xs font-medium">사진 준비중</span>
-              </div>
-            </div>
+          {/* 세무사 사진 */}
+          <div className="flex shrink-0 items-center justify-center overflow-hidden bg-slate-100 sm:w-52">
+            <img
+              src="/images/tax-consultant.png"
+              alt="협력 세무 전문가"
+              className="h-52 w-full object-cover object-top sm:h-full"
+            />
           </div>
 
           {/* 약력 */}
@@ -43,7 +40,12 @@ export function TaxConsultSection() {
               협력 세무 전문가
             </div>
             <h3 className="text-xl font-bold text-slate-900">전직 용산세무서장 출신</h3>
-            <p className="mt-0.5 text-sm text-slate-500">국립세무대학 4기 · 국세청 30년 경력</p>
+            <p className="mt-1 text-sm font-medium text-slate-700">
+              국세청 30년 경력의 세무전문가입니다.<br />
+              조사, 상속, 증여를 전문으로 하고 있습니다.<br />
+              <span className="text-brand-700 font-semibold">세무는 아이디어 싸움입니다.</span>
+            </p>
+            <p className="mt-0.5 text-xs text-slate-400">국립세무대학 4기</p>
 
             {/* 주요 약력 */}
             <ul className="mt-5 space-y-2">
@@ -91,8 +93,19 @@ export function TaxConsultSection() {
           </div>
         </div>
 
+        {/* 수수료 없음 안내 */}
+        <div className="mt-6 flex items-center justify-center gap-2 rounded-xl border border-brand-100 bg-brand-50 px-5 py-3 text-sm text-brand-800">
+          <svg className="h-4 w-4 shrink-0 text-brand-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+          </svg>
+          <span>
+            <strong>초기 상담 시 어떠한 수수료도 받지 않습니다.</strong>
+            &nbsp;상담 후 진행 여부는 고객님이 결정하세요.
+          </span>
+        </div>
+
         {/* 하단 키워드 뱃지 */}
-        <div className="mt-8 flex flex-wrap justify-center gap-2">
+        <div className="mt-6 flex flex-wrap justify-center gap-2">
           {["가족간 차용증 세무 검토", "증여세 절세 전략", "자금조달계획서 세무 리스크", "세무조사 대응", "법인세·소득세 상담"].map((tag) => (
             <span
               key={tag}
