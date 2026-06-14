@@ -1,6 +1,6 @@
 "use client";
 
-// 이메일 세무상담 신청 폼 (접이식) — TaxConsultSection 내부에서 사용
+// 이메일 세무상담 신청 폼 — TaxConsultSection 카드 아래에 전체 폭으로 펼쳐짐
 import React, { useState } from "react";
 
 type Status = "idle" | "submitting" | "success" | "error";
@@ -8,8 +8,8 @@ type Status = "idle" | "submitting" | "success" | "error";
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const PHONE_RE = /^[0-9\-]{9,20}$/;
 
-export function TaxConsultForm() {
-  const [isOpen, setIsOpen] = useState(false);
+// isOpen은 상위(TaxConsultSection)에서 제어
+export function TaxConsultForm({ isOpen }: { isOpen: boolean }) {
   const [form, setForm] = useState({
     name: "",
     phone: "",
@@ -75,6 +75,9 @@ export function TaxConsultForm() {
     }
   };
 
+  // 닫혀있고 아직 제출 전이면 아무것도 렌더하지 않음
+  if (!isOpen && status !== "success") return null;
+
   // 신청 완료 화면
   if (status === "success") {
     return (
@@ -89,27 +92,12 @@ export function TaxConsultForm() {
     );
   }
 
+  // 이메일 상담 폼 — 카드 아래 전체 폭
   return (
-    <div className="mt-6">
-      {/* 토글 버튼 */}
-      <button
-        type="button"
-        onClick={() => setIsOpen((v) => !v)}
-        className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand-300 bg-white px-6 py-3 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50 sm:w-auto"
-        aria-expanded={isOpen}
-      >
-        이메일 상담 신청
-        <span className={`transition-transform ${isOpen ? "rotate-180" : ""}`}>
-          ▼
-        </span>
-      </button>
-
-      {/* 접이식 폼 */}
-      {isOpen && (
-        <form
-          onSubmit={handleSubmit}
-          className="mt-4 space-y-4 rounded-2xl border border-slate-200 bg-white p-6"
-        >
+    <form
+      onSubmit={handleSubmit}
+      className="mt-6 space-y-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8"
+    >
           <div>
             <label className="mb-1 block text-sm font-medium text-slate-700">
               이름 <span className="text-red-500">*</span>
@@ -192,8 +180,6 @@ export function TaxConsultForm() {
           <p className="text-center text-xs text-slate-400">
             ※ 초기 상담 무료 · 영업일 1~2일 내 연락드립니다
           </p>
-        </form>
-      )}
-    </div>
+    </form>
   );
 }

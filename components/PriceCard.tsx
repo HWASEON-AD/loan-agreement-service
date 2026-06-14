@@ -2,6 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import { Button } from "./ui/Button";
+import { Reveal } from "./ui/Reveal";
 import { SERVICE_PRICE, SERVICE_PRICE_ORIGINAL, SUBSCRIPTION_PRICE } from "@/lib/config";
 import { formatNumber } from "@/lib/interest-calc";
 
@@ -9,12 +10,12 @@ export function PriceCard() {
   return (
     <section className="bg-slate-50 py-12 sm:py-20">
       <div className="mx-auto max-w-4xl px-4 sm:px-6">
-        <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
+        <Reveal as="h2" variant="fade-up" className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
           합리적인 가격
-        </h2>
+        </Reveal>
         <div className="mt-10 grid gap-6 sm:grid-cols-2">
           {/* 기본 패키지 */}
-          <div className="rounded-2xl border-2 border-brand-600 bg-white p-7 shadow-md">
+          <Reveal variant="fade-up" delay={0} className="rounded-2xl border-2 border-brand-600 bg-white p-7 shadow-md transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
             <div className="flex items-center gap-2">
               <span className="inline-block rounded-full bg-brand-100 px-3 py-1 text-xs font-semibold text-brand-700">
                 기본 패키지
@@ -52,10 +53,10 @@ export function PriceCard() {
             <Link href="/create/step/1" className="mt-6 block">
               <Button fullWidth>약정서 작성 시작</Button>
             </Link>
-          </div>
+          </Reveal>
 
           {/* 이자 관리 구독 */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-7">
+          <Reveal variant="fade-up" delay={120} className="rounded-2xl border border-slate-200 bg-white p-7 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
             <span className="inline-block rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
               옵션 · 이자 관리 구독
             </span>
@@ -73,7 +74,7 @@ export function PriceCard() {
             <Button variant="outline" fullWidth className="mt-6" disabled>
               준비 중
             </Button>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>

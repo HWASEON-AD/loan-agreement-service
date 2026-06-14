@@ -1,24 +1,26 @@
 // 랜딩 페이지 (/)
 import React from "react";
 import { LandingHero } from "@/components/LandingHero";
-import { ProcessSteps } from "@/components/ProcessSteps";
+import { ProcessShowcase } from "@/components/ProcessShowcase";
 import { PriceCard } from "@/components/PriceCard";
 import { SubscriptionPromo } from "@/components/SubscriptionPromo";
 import { TaxConsultSection } from "@/components/TaxConsultSection";
 import { Footer } from "@/components/Footer";
+import { Reveal } from "@/components/ui/Reveal";
+import { FaqAccordion } from "@/components/FaqAccordion";
 
 // 문제 제기 섹션
 function ProblemSection() {
   return (
     <section className="bg-slate-50 py-12 sm:py-20">
       <div className="mx-auto max-w-4xl px-4 sm:px-6">
-        <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
+        <Reveal as="h2" variant="fade-up" className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
           &ldquo;가족 사이라 그냥 빌려줬다가 나중에...&rdquo;
-        </h2>
-        <p className="mx-auto mt-4 max-w-2xl text-center text-slate-500">
+        </Reveal>
+        <Reveal as="p" variant="fade-up" delay={80} className="mx-auto mt-4 max-w-2xl text-center text-slate-500">
           가족 간 금전 거래는 기록이 없으면 분쟁이나 조사 상황에서 사실 관계를
           입증하기 어렵습니다. 객관적인 증거가 필요합니다.
-        </p>
+        </Reveal>
         <div className="mt-10 grid gap-5 sm:grid-cols-3">
           {[
             {
@@ -33,14 +35,16 @@ function ProblemSection() {
               t: "객관적 발송 증거",
               d: "우체국이 내용과 날짜를 증명하는 내용증명 우편",
             },
-          ].map((c) => (
-            <div
+          ].map((c, i) => (
+            <Reveal
               key={c.t}
-              className="rounded-2xl border border-slate-200 bg-white p-6"
+              variant="fade-up"
+              delay={i * 120}
+              className="rounded-2xl border border-slate-200 bg-white p-6 transition-all duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-lg"
             >
               <h3 className="font-semibold text-brand-700">{c.t}</h3>
               <p className="mt-2 text-sm text-slate-500">{c.d}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>
@@ -53,11 +57,11 @@ function LegalEffectSection() {
   return (
     <section className="bg-white py-12 sm:py-20">
       <div className="mx-auto max-w-4xl px-4 sm:px-6">
-        <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
+        <Reveal as="h2" variant="fade-up" className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
           법적 효력 안내
-        </h2>
+        </Reveal>
         <div className="mt-10 grid gap-6 sm:grid-cols-2">
-          <div className="rounded-2xl border border-brand-200 bg-brand-50 p-6">
+          <Reveal variant="fade-up" delay={0} className="rounded-2xl border border-brand-200 bg-brand-50 p-6">
             <h3 className="font-semibold text-brand-800">전자서명의 효력</h3>
             <p className="mt-2 text-sm text-brand-900/80">
               전자문서 및 전자거래 기본법에 따라, 본인인증(이메일 OTP)을 거친
@@ -68,8 +72,8 @@ function LegalEffectSection() {
               전자서명법 제3조(전자서명의 효력): 당사자 간 합의에 따라 선택된
               전자서명은 서면 서명과 동일한 효력을 가집니다.
             </p>
-          </div>
-          <div className="rounded-2xl border border-brand-200 bg-brand-50 p-6">
+          </Reveal>
+          <Reveal variant="fade-up" delay={120} className="rounded-2xl border border-brand-200 bg-brand-50 p-6">
             <h3 className="font-semibold text-brand-800">
               우체국 내용증명의 의미
             </h3>
@@ -78,7 +82,7 @@ function LegalEffectSection() {
               발송했는지&rdquo;를 공적으로 증명하는 제도입니다. 발송 사실과 내용,
               일자에 대한 객관적 증거가 됩니다.
             </p>
-          </div>
+          </Reveal>
         </div>
       </div>
     </section>
@@ -133,24 +137,10 @@ function FaqSection() {
   return (
     <section className="bg-slate-50 py-12 sm:py-20">
       <div className="mx-auto max-w-3xl px-4 sm:px-6">
-        <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
+        <Reveal as="h2" variant="fade-up" className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
           자주 묻는 질문
-        </h2>
-        <div className="mt-10 space-y-3">
-          {FAQS.map((f, i) => (
-            <details
-              key={i}
-              className="group rounded-xl border border-slate-200 bg-white p-5"
-            >
-              <summary className="cursor-pointer list-none font-medium text-slate-800">
-                Q. {f.q}
-              </summary>
-              <p className="mt-3 text-sm leading-relaxed text-slate-500">
-                {f.a}
-              </p>
-            </details>
-          ))}
-        </div>
+        </Reveal>
+        <FaqAccordion items={FAQS} />
       </div>
     </section>
   );
@@ -161,7 +151,7 @@ export default function HomePage() {
     <main>
       <LandingHero />
       <ProblemSection />
-      <ProcessSteps />
+      <ProcessShowcase />
       <PriceCard />
       <SubscriptionPromo />
       <TaxConsultSection />
