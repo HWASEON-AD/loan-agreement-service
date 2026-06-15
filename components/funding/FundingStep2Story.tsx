@@ -125,7 +125,10 @@ export function FundingStep2Story({
         <Button variant="outline" onClick={onBack} disabled={isLoading}>
           ← 이전
         </Button>
-        <Button onClick={handleAnalyze} disabled={isLoading}>
+        <Button
+          onClick={handleAnalyze}
+          disabled={isLoading || story.trim().length < 10 || story.length > 2000}
+        >
           {isLoading ? (
             <span className="flex items-center gap-2">
               <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />

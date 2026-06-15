@@ -21,14 +21,16 @@ export function Input({
       {label && (
         <label
           htmlFor={inputId}
-          className="mb-1.5 block text-sm font-medium text-slate-700"
+          className={`mb-1.5 block text-sm font-medium ${
+            rest.disabled ? "text-slate-400" : "text-slate-700"
+          }`}
         >
           {label}
         </label>
       )}
       <input
         id={inputId}
-        className={`w-full rounded-xl border bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-100 ${
+        className={`w-full rounded-xl border bg-white px-4 py-3 text-sm outline-none transition-colors focus:border-brand-500 focus:ring-2 focus:ring-brand-100 disabled:bg-slate-50 disabled:text-slate-400 ${
           error ? "border-red-400" : "border-slate-300"
         } ${className}`}
         {...rest}

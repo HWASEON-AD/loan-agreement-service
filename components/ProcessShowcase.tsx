@@ -98,25 +98,25 @@ export function ProcessShowcase() {
         </Reveal>
 
         <div
-          className="mt-10 grid gap-6 lg:grid-cols-12 lg:items-stretch"
+          className="mt-10 grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-stretch"
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => !reducedRef.current && setPaused(false)}
         >
           {/* 좌측: 미디어 프레임 */}
-          <Reveal variant="fade-up" className="lg:col-span-7">
-            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg">
+          <Reveal variant="fade-up" className="lg:col-span-7 lg:h-full">
+            <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-lg lg:flex lg:h-full lg:flex-col">
               {/* 브라우저 상단바 */}
               <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50 px-4 py-3">
                 <span className="h-3 w-3 rounded-full bg-red-400" />
                 <span className="h-3 w-3 rounded-full bg-amber-400" />
                 <span className="h-3 w-3 rounded-full bg-green-400" />
-                <span className="ml-3 truncate text-sm font-medium text-slate-500">
+                <span className="ml-3 min-w-0 truncate text-sm font-medium text-slate-500">
                   {current.title}
                 </span>
               </div>
 
-              {/* 미디어 본문 (16:10 비율) */}
-              <div className="relative aspect-[16/10] w-full bg-slate-50">
+              {/* 미디어 본문 (모바일 16:9 고정 · 데스크톱은 카드 높이를 채워 좌우 정렬) */}
+              <div className="relative aspect-[16/9] w-full bg-slate-50 lg:aspect-auto lg:flex-1">
                 {STEPS.map((s, i) => (
                   <div
                     key={s.n}
@@ -131,7 +131,7 @@ export function ProcessShowcase() {
 
               {/* 하단 캡션 + 진행 세그먼트 */}
               <div className="flex items-center justify-between gap-4 border-t border-slate-100 px-4 py-3">
-                <p className="truncate text-sm text-slate-500">
+                <p className="min-w-0 truncate text-sm text-slate-500">
                   <span className="font-semibold text-slate-700">Step {current.n}</span>
                   {" · "}
                   {current.short}
@@ -231,7 +231,7 @@ function StepMedia({ step }: { step: Step }) {
       <img
         src={step.media.src}
         alt={`${step.title} 화면`}
-        className="h-full w-full object-cover"
+        className="h-full w-full object-cover object-top"
       />
     );
   }

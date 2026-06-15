@@ -129,6 +129,25 @@ export function FundingStep1Basic({ initialData, onNext }: Props) {
     return Object.keys(errs).length === 0;
   };
 
+  // 버튼 활성화용 순수 검증 (상태 변경 없음)
+  const baseValid =
+    name.trim().length >= 2 &&
+    /^\d{6}$/.test(idFront) &&
+    /^\d{7}$/.test(idBack) &&
+    address.trim().length >= 5 &&
+    /^010-\d{4}-\d{4}$/.test(phone);
+  const tradeValid =
+    formType === "housing"
+      ? parseAmount(tradeAmountStr) > 0
+      : landParcels.length > 0 &&
+        landParcels.every(
+          (p) =>
+            p.location.trim() &&
+            typeof p.tradeAmount === "number" &&
+            p.tradeAmount > 0
+        );
+  const isValid = baseValid && tradeValid;
+
   const handleNext = () => {
     if (!validate()) return;
 
@@ -363,7 +382,9 @@ export function FundingStep1Basic({ initialData, onNext }: Props) {
       )}
 
       <div className="flex justify-end">
-        <Button onClick={handleNext}>다음 단계 →</Button>
+        <Button onClick={handleNext} disabled={!isValid}>
+          다음 단계 →
+        </Button>
       </div>
     </Card>
   );

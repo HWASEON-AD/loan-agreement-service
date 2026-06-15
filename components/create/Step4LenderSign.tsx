@@ -77,25 +77,27 @@ export function Step4LenderSign() {
           />
         </div>
 
-        {/* 2) 서명 캔버스 (OTP 인증 후 활성) */}
+        {/* 2) 서명 캔버스 + 서명 완료 버튼 (OTP 인증 후에만 노출) */}
         {otpVerified && (
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-slate-700">
-              2. 전자서명
-            </h3>
-            <SignatureCanvasField onChange={setSignature} />
+          <div className="space-y-5">
+            <div>
+              <h3 className="mb-2 text-sm font-semibold text-slate-700">
+                2. 전자서명
+              </h3>
+              <SignatureCanvasField onChange={setSignature} />
+            </div>
+
+            {error && <p className="text-sm text-red-500">{error}</p>}
+
+            <Button
+              onClick={handleSign}
+              disabled={!signature || loading}
+              fullWidth
+            >
+              {loading ? "처리 중..." : "서명 완료 — 다음 단계"}
+            </Button>
           </div>
         )}
-
-        {error && <p className="text-sm text-red-500">{error}</p>}
-
-        <Button
-          onClick={handleSign}
-          disabled={!otpVerified || !signature || loading}
-          fullWidth
-        >
-          {loading ? "처리 중..." : "서명 완료 — 다음 단계"}
-        </Button>
       </div>
     </StepForm>
   );

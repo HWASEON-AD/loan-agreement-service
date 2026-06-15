@@ -33,7 +33,8 @@ export function LandingHero() {
           한번에! 완벽하게!
         </Reveal>
         <Reveal as="p" variant="fade-up" delay={200} className="mx-auto mt-5 max-w-2xl text-base text-brand-100 sm:text-lg">
-          대여약정서 + 전자서명 + 우체국 내용증명 —{" "}
+          대여약정서 + 전자서명 + 우체국 내용증명
+          <br />{" "}
           {SERVICE_PRICE === 0 ? (
             <>
               <span className="font-bold text-white/60 line-through">

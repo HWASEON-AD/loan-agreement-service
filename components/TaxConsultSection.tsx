@@ -29,8 +29,8 @@ export function TaxConsultSection() {
         {/* 전문가 카드 — 좌측 약력 / 우측 사진 */}
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm sm:flex sm:items-stretch">
 
-          {/* 세무사 사진 (왼쪽, 크게 · 카드 높이 꽉 채움) */}
-          <div className="h-72 w-full shrink-0 overflow-hidden bg-slate-100 sm:h-auto sm:w-[44%]">
+          {/* 세무사 사진 — 모바일은 원본(세로) 비율로, PC는 카드 높이 꽉 채움 */}
+          <div className="mx-auto mt-6 aspect-[3/4] w-full max-w-[280px] shrink-0 overflow-hidden bg-slate-100 sm:mx-0 sm:mt-0 sm:aspect-auto sm:h-auto sm:max-w-none sm:w-[44%]">
             <img
               src="/images/tax-consultant.png"
               alt="협력 세무 전문가"
@@ -91,9 +91,7 @@ export function TaxConsultSection() {
                 className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand-300 bg-white px-6 py-3 text-sm font-semibold text-brand-700 transition-colors hover:bg-brand-50 sm:w-auto"
               >
                 이메일 상담 신청
-                <span className={`transition-transform ${isFormOpen ? "rotate-180" : ""}`}>
-                  ▼
-                </span>
+                <span className={isFormOpen ? "rotate-180" : ""}>▼</span>
               </button>
             </div>
           </div>

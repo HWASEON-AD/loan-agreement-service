@@ -171,7 +171,7 @@ export function TaxConsultForm({ isOpen }: { isOpen: boolean }) {
 
           <button
             type="submit"
-            disabled={status === "submitting"}
+            disabled={status === "submitting" || validate() !== null}
             className="w-full rounded-xl bg-brand-700 px-6 py-3 text-sm font-semibold text-white transition-colors hover:bg-brand-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
           >
             {status === "submitting" ? "신청 중..." : "신청하기"}

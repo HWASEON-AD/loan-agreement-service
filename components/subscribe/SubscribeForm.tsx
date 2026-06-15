@@ -104,7 +104,11 @@ export function SubscribeForm({
 
         {error && <p className="text-sm text-red-500">{error}</p>}
 
-        <Button type="submit" fullWidth disabled={loading}>
+        <Button
+          type="submit"
+          fullWidth
+          disabled={loading || !/^\S+@\S+\.\S+/.test(email)}
+        >
           {loading
             ? "신청 중..."
             : `구독 신청하기 (월 ${formatNumber(SUBSCRIPTION_PRICE)}원)`}

@@ -1,5 +1,6 @@
 // 서비스 프로세스 5단계 섹션
 import React from "react";
+import { Reveal } from "./ui/Reveal";
 
 const STEPS = [
   {
@@ -33,24 +34,26 @@ export function ProcessSteps() {
   return (
     <section id="process" className="bg-white py-12 sm:py-20">
       <div className="mx-auto max-w-5xl px-4 sm:px-6">
-        <h2 className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
+        <Reveal as="h2" variant="fade-up" className="text-center text-2xl font-bold text-slate-900 sm:text-3xl">
           전자서명 → 우체국 내용증명 → 법적효력 완성
-        </h2>
-        <p className="mt-3 text-center text-slate-500">
+        </Reveal>
+        <Reveal as="p" variant="fade-up" delay={80} className="mt-3 text-center text-slate-500">
           단 5단계로 끝나는 안전한 금전 거래 증거 만들기
-        </p>
+        </Reveal>
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
-          {STEPS.map((s) => (
-            <div
+          {STEPS.map((s, i) => (
+            <Reveal
               key={s.n}
-              className="rounded-2xl border border-slate-100 bg-slate-50 p-5 text-center"
+              variant="fade-up"
+              delay={i * 100}
+              className="rounded-2xl border border-slate-100 bg-slate-50 p-5 text-center transition-all duration-300 hover:-translate-y-1 hover:border-brand-200 hover:shadow-lg"
             >
               <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-brand-700 text-lg font-bold text-white">
                 {s.n}
               </div>
               <h3 className="font-semibold text-slate-900">{s.title}</h3>
               <p className="mt-2 text-sm text-slate-500">{s.desc}</p>
-            </div>
+            </Reveal>
           ))}
         </div>
       </div>

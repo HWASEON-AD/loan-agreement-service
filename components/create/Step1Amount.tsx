@@ -36,6 +36,18 @@ export function Step1Amount() {
   const rate = free ? 0 : (적정이자율 * 100).toFixed(1); // % 표기용 (소수 → 퍼센트)
   const monthly = calcMonthlyInterest(amount, recommendedRate(amount));
 
+  // 필수 입력 충족 여부 (버튼 활성화 조건)
+  const datesValid = (() => {
+    if (!form.startDate || !form.endDate) return false;
+    const start = new Date(form.startDate);
+    const end = new Date(form.endDate);
+    if (end <= start) return false;
+    const maxEnd = new Date(start);
+    maxEnd.setFullYear(maxEnd.getFullYear() + 5);
+    return end <= maxEnd;
+  })();
+  const canNext = amount >= 100000 && datesValid;
+
   // 다음 단계로
   const handleNext = () => {
     if (amount < 100000) {
@@ -179,7 +191,7 @@ export function Step1Amount() {
 
         {error && <p className="text-sm text-red-500">{error}</p>}
 
-        <Button onClick={handleNext} fullWidth>
+        <Button onClick={handleNext} fullWidth disabled={!canNext}>
           다음 — 당사자 정보 입력
         </Button>
       </div>

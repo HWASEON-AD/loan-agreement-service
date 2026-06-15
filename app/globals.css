@@ -19,10 +19,24 @@ body {
   color: var(--foreground);
   background: var(--background);
   -webkit-font-smoothing: antialiased;
+  /* 한국어 줄바꿈: 단어(띄어쓰기) 단위 우선, <br> 존중, 너무 긴 단어는 음절 단위로 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 * {
   box-sizing: border-box;
+}
+
+/* 모바일 입력창 자동 확대(줌) 방지
+   — iOS Safari는 글자 16px 미만 입력창에 포커스하면 화면을 확대하고,
+     포커스가 풀려도 되돌리지 않음. 16px 이상이면 확대 자체가 일어나지 않음. */
+@media (max-width: 640px) {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    font-size: 16px;
+  }
 }
 
 /* 서명 캔버스 기본 스타일 */

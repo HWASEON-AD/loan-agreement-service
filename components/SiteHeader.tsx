@@ -27,6 +27,12 @@ export function SiteHeader() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // 현재 페이지인지 판정 — 앵커(#섹션 이동) 링크는 기본 선택 표시하지 않음
+  const isActive = (href: string) => {
+    if (href.includes("#")) return false;
+    return href === "/" ? pathname === "/" : pathname.startsWith(href);
+  };
+
   if (
     pathname.startsWith("/admin") ||
     pathname.startsWith("/sign") ||
@@ -43,10 +49,7 @@ export function SiteHeader() {
         {/* 데스크탑 네비게이션 */}
         <nav className="hidden md:flex items-center gap-1">
           {NAV_ITEMS.map((item) => {
-            const active =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href.split("#")[0]);
+            const active = isActive(item.href);
             return (
               <Link
                 key={item.href}
@@ -88,10 +91,7 @@ export function SiteHeader() {
       {menuOpen && (
         <div className="md:hidden border-t border-slate-100 bg-white px-4 py-2 shadow-lg">
           {NAV_ITEMS.map((item) => {
-            const active =
-              item.href === "/"
-                ? pathname === "/"
-                : pathname.startsWith(item.href.split("#")[0]);
+            const active = isActive(item.href);
             return (
               <Link
                 key={item.href}
