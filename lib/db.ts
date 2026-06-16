@@ -972,3 +972,14 @@ export async function updateInterestRecord(
   if (error || !data) return undefined;
   return rowToInterestRecord(data);
 }
+
+// ── 약정서 삭제 ──────────────────────────────
+export async function deleteAgreement(id: string): Promise<boolean> {
+  const sb = getSupabaseAdmin();
+  if (!sb) {
+    mock.deleteAgreement(id);
+    return true;
+  }
+  const { error } = await sb.from("agreements").delete().eq("id", id);
+  return !error;
+}

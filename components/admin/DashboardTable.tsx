@@ -1,6 +1,6 @@
 "use client";
 
-// 약정서 목록 테이블 + 필터 탭 + 상세 모달 제어 (클라이언트)
+// 약정서 목록 테이블 + 필터 탭 + 체크박스 + 일괄 다운로드/삭제
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { formatNumber } from "@/lib/interest-calc";
@@ -12,7 +12,6 @@ import {
 import { StatusBadge, type DashboardStatus } from "./StatusBadge";
 import { AgreementModal } from "./AgreementModal";
 
-// 목록 행 단위 데이터 (API 응답 구조와 일치)
 interface AgreementRow {
   id: string;
   createdAt: string;
@@ -42,7 +41,6 @@ const FILTERS: { key: FilterKey; label: string }[] = [
   { key: "expiring", label: "만기임박" },
 ];
 
-// KST 오늘 기준 end_date 까지 남은 일수 (end - today)
 function daysUntil(endDate: string): number {
   if (!endDate) return Number.POSITIVE_INFINITY;
   const todayStr = new Date(Date.now() + 9 * 60 * 60 * 1000)
@@ -53,13 +51,11 @@ function daysUntil(endDate: string): number {
   return Math.round((end - today) / (24 * 60 * 60 * 1000));
 }
 
-// 만기임박 여부 — 완료(서명완료) 상태 + 30일 이내(경과 포함)
 function isExpiring(r: { dashboardStatus: DashboardStatus; endDate: string }): boolean {
   if (r.dashboardStatus !== "signed") return false;
   return daysUntil(r.endDate) <= 30;
 }
 
-// D-day 뱃지 (만기임박 탭 전용)
 function ExpiryBadge({ endDate }: { endDate: string }) {
   const d = daysUntil(endDate);
   let label: string;
@@ -81,6 +77,16 @@ function ExpiryBadge({ endDate }: { endDate: string }) {
   );
 }
 
+// 단일 PDF 다운로드 트리거
+function downloadPdf(agreementId: string) {
+  const a = document.createElement("a");
+  a.href = `/api/agreements/${agreementId}/pdf`;
+  a.download = `loan-agreement-${agreementId}.pdf`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
 export function DashboardTable() {
   const router = useRouter();
   const [agreements, setAgreements] = useState<AgreementRow[]>([]);
@@ -89,22 +95,21 @@ export function DashboardTable() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [bulkLoading, setBulkLoading] = useState(false);
 
-  // 연속 탭 클릭 race condition 방지용
   const abortRef = useRef<AbortController | null>(null);
 
-  // 약정서 목록 로드
   const load = useCallback(
     async (status: FilterKey) => {
-      // 이전 요청 취소
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
 
       setLoading(true);
       setError("");
+      setCheckedIds(new Set());
       try {
-        // 만기임박은 서버 필터가 없으므로 전체를 받아 클라이언트에서 필터링
         const apiStatus = status === "expiring" ? "all" : status;
         const res = await fetch(`/api/admin/agreements?status=${apiStatus}`, {
           cache: "no-store",
@@ -112,7 +117,6 @@ export function DashboardTable() {
         });
         if (res.status === 401) {
           setError("세션이 만료되었습니다. 다시 로그인해주세요.");
-          // 잠시 후 로그인 페이지로 이동
           setTimeout(() => router.push("/admin"), 1500);
           return;
         }
@@ -127,7 +131,7 @@ export function DashboardTable() {
         setAgreements(rows);
         setStats(data.stats);
       } catch (e) {
-        if ((e as Error).name === "AbortError") return; // 취소는 무시
+        if ((e as Error).name === "AbortError") return;
         setError(e instanceof Error ? e.message : "서버 오류가 발생했습니다.");
       } finally {
         setLoading(false);
@@ -140,19 +144,60 @@ export function DashboardTable() {
     load(filter);
   }, [filter, load]);
 
-  // 각 탭 건수 계산 (전체 기준 통계가 있을 때만 정확)
-  // 탭 건수는 항상 전체 통계 기준으로 표시 (필터링과 무관)
   const tabCounts: Record<FilterKey, number | null> = {
     all: stats ? stats.total : null,
     pending: stats ? stats.pendingCount : null,
     signed: stats ? stats.signedCount : null,
-    // 만기임박은 현재 탭에서만 정확히 계산되므로, 활성 시 표시
     expiring: filter === "expiring" ? agreements.length : null,
   };
 
+  const allChecked =
+    agreements.length > 0 && checkedIds.size === agreements.length;
+
+  const toggleAll = () => {
+    if (allChecked) {
+      setCheckedIds(new Set());
+    } else {
+      setCheckedIds(new Set(agreements.map((a) => a.id)));
+    }
+  };
+
+  const toggleOne = (id: string) => {
+    setCheckedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  // 선택된 항목 PDF 순차 다운로드 (300ms 간격)
+  const handleBulkDownload = async () => {
+    const ids = Array.from(checkedIds);
+    for (let i = 0; i < ids.length; i++) {
+      downloadPdf(ids[i]);
+      if (i < ids.length - 1) await new Promise((r) => setTimeout(r, 300));
+    }
+  };
+
+  // 선택된 항목 일괄 삭제
+  const handleBulkDelete = async () => {
+    if (!window.confirm(`선택한 ${checkedIds.size}건을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+    setBulkLoading(true);
+    const ids = Array.from(checkedIds);
+    await Promise.all(
+      ids.map((id) =>
+        fetch(`/api/admin/agreements/${id}`, { method: "DELETE" })
+      )
+    );
+    setBulkLoading(false);
+    load(filter);
+  };
+
+  const checkedCount = checkedIds.size;
+
   return (
     <div>
-      {/* 요약 카드 (항상 전체 기준) */}
       <DashboardStats
         stats={
           stats ?? {
@@ -166,8 +211,8 @@ export function DashboardTable() {
         loading={loading && !stats}
       />
 
-      {/* 필터 탭 */}
-      <div className="mb-4 flex flex-wrap gap-2">
+      {/* 필터 탭 + 일괄 액션 바 */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         {FILTERS.map((f) => {
           const count = tabCounts[f.key];
           const active = filter === f.key;
@@ -195,6 +240,26 @@ export function DashboardTable() {
             </button>
           );
         })}
+
+        {checkedCount > 0 && (
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-sm text-slate-500">{checkedCount}건 선택</span>
+            <button
+              onClick={handleBulkDownload}
+              disabled={bulkLoading}
+              className="rounded-lg border border-brand-300 bg-white px-3 py-1.5 text-sm font-medium text-brand-700 hover:bg-brand-50 disabled:opacity-50"
+            >
+              PDF 다운로드
+            </button>
+            <button
+              onClick={handleBulkDelete}
+              disabled={bulkLoading}
+              className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+            >
+              {bulkLoading ? "삭제 중..." : "삭제"}
+            </button>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -203,11 +268,20 @@ export function DashboardTable() {
         </p>
       )}
 
-      {/* 데스크톱 테이블 (md 이상) */}
+      {/* 데스크톱 테이블 */}
       <div className="hidden overflow-x-auto rounded-2xl border border-slate-200 bg-white md:block">
         <table className="w-full text-left text-sm">
           <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
             <tr>
+              <th className="px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={allChecked}
+                  onChange={toggleAll}
+                  className="rounded border-slate-300"
+                  aria-label="전체 선택"
+                />
+              </th>
               <th className="px-4 py-3">생성일</th>
               <th className="px-4 py-3">채권자</th>
               <th className="px-4 py-3">채무자</th>
@@ -219,13 +293,13 @@ export function DashboardTable() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                   불러오는 중...
                 </td>
               </tr>
             ) : agreements.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-slate-400">
+                <td colSpan={7} className="px-4 py-8 text-center text-slate-400">
                   약정서가 없습니다.
                 </td>
               </tr>
@@ -233,8 +307,19 @@ export function DashboardTable() {
               agreements.map((r) => (
                 <tr
                   key={r.id}
-                  className="border-b border-slate-100 last:border-0 hover:bg-slate-50"
+                  className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 ${
+                    checkedIds.has(r.id) ? "bg-brand-50" : ""
+                  }`}
                 >
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={checkedIds.has(r.id)}
+                      onChange={() => toggleOne(r.id)}
+                      className="rounded border-slate-300"
+                      aria-label={`${r.lenderName} 선택`}
+                    />
+                  </td>
                   <td className="px-4 py-3 text-slate-500">
                     {r.createdAt.slice(5, 10)}
                   </td>
@@ -269,7 +354,7 @@ export function DashboardTable() {
         </table>
       </div>
 
-      {/* 모바일 카드 리스트 (md 미만) */}
+      {/* 모바일 카드 */}
       <div className="space-y-3 md:hidden">
         {loading ? (
           <div className="rounded-2xl border border-slate-200 bg-white px-4 py-8 text-center text-slate-400">
@@ -283,12 +368,22 @@ export function DashboardTable() {
           agreements.map((r) => (
             <div
               key={r.id}
-              className="rounded-2xl border border-slate-200 bg-white p-4"
+              className={`rounded-2xl border border-slate-200 bg-white p-4 ${
+                checkedIds.has(r.id) ? "border-brand-300 bg-brand-50" : ""
+              }`}
             >
               <div className="mb-2 flex items-center justify-between">
-                <span className="text-xs text-slate-400">
-                  {r.createdAt.slice(0, 10)}
-                </span>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={checkedIds.has(r.id)}
+                    onChange={() => toggleOne(r.id)}
+                    className="rounded border-slate-300"
+                  />
+                  <span className="text-xs text-slate-400">
+                    {r.createdAt.slice(0, 10)}
+                  </span>
+                </div>
                 {filter === "expiring" ? (
                   <ExpiryBadge endDate={r.endDate} />
                 ) : (
@@ -314,7 +409,6 @@ export function DashboardTable() {
         )}
       </div>
 
-      {/* 상세 모달 */}
       {selectedId && (
         <AgreementModal
           agreementId={selectedId}

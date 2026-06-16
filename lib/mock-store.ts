@@ -101,6 +101,10 @@ export function listAgreements(): Agreement[] {
   );
 }
 
+export function deleteAgreement(id: string): void {
+  getStore().agreements.delete(id);
+}
+
 // ---------- OTP ----------
 
 // OTP 저장 (signerType 별로 최신 1개만 유지)

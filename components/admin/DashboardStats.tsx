@@ -1,6 +1,6 @@
 "use client";
 
-// 대시보드 요약 카드 4종 — 전체/서명완료/오늘생성/총대여금액
+// 대시보드 요약 카드 3종 — 전체/서명완료/오늘생성
 import React from "react";
 
 export interface DashboardStats {
@@ -55,7 +55,7 @@ function StatCard({
 
 export function DashboardStats({ stats, loading }: DashboardStatsProps) {
   return (
-    <div className="mb-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+    <div className="mb-6 grid grid-cols-3 gap-3 sm:gap-4">
       <StatCard
         label="전체 약정서"
         value={`${stats.total}건`}
@@ -72,12 +72,6 @@ export function DashboardStats({ stats, loading }: DashboardStatsProps) {
         label="오늘 생성"
         value={`${stats.todayCount}건`}
         accent="text-blue-600"
-        loading={loading}
-      />
-      <StatCard
-        label="총 대여금액"
-        value={formatAmount(stats.totalAmount)}
-        accent="text-indigo-600"
         loading={loading}
       />
     </div>
