@@ -47,14 +47,9 @@ export async function POST(req: NextRequest) {
 
     let paymentKey = body.paymentKey || null;
 
-    const isFree = SERVICE_PRICE === 0;
     const mockAllowed = isMockMode() && process.env.NODE_ENV !== "production";
 
-    if (isFree) {
-      // 무료 플로우 — 결제 없이 바로 완료
-      paymentKey = `FREE_${Date.now()}`;
-      console.log(`[FREE] agreement=${agreement.id} 무료 처리`);
-    } else if (mockAllowed) {
+    if (mockAllowed) {
       paymentKey = `MOCK_${Date.now()}`;
       console.log(
         `[MOCK PAYMENT] agreement=${agreement.id} amount=${SERVICE_PRICE} 자동 결제 성공`

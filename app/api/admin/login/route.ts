@@ -22,9 +22,9 @@ export async function POST(req: NextRequest) {
     // httpOnly 세션 쿠키 저장 (프론트 JS 접근 불가)
     res.cookies.set(ADMIN_COOKIE, expectedSessionToken(), {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // 프로덕션에서만 HTTPS 강제
-      sameSite: "strict", // lax → strict (CSRF 추가 방어)
-      path: "/admin", // / 전체 대신 /admin 하위로 범위 제한
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      path: "/", // /api/admin/* 포함 전체 경로에서 쿠키 전송되도록 루트 사용
       maxAge: 60 * 60 * 8, // 8시간
     });
     return res;

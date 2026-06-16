@@ -10,7 +10,7 @@ export function isMockMode(): boolean {
 
 // 서비스 기본 정보
 export const SERVICE_NAME = "/ 내지마요";
-export const SERVICE_PRICE = 0;        // 실제 결제 금액 (현재 무료 이벤트)
+export const SERVICE_PRICE: number = 30000;    // 실제 결제 금액
 export const SERVICE_PRICE_ORIGINAL = 30000; // 정가 (표시용)
 export const SUBSCRIPTION_PRICE = 9900; // 이자 관리 구독 (월, 원)
 

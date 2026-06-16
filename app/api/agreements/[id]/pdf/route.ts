@@ -2,6 +2,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getAgreement, getSignaturesByAgreement } from "@/lib/db";
+import { isAdminAuthenticated } from "@/lib/admin-auth";
 
 export async function GET(
   req: NextRequest,
@@ -25,10 +26,10 @@ export async function GET(
       );
     }
 
-    // 추가 접근 제어: 토큰 검증
+    // 추가 접근 제어: 어드민 쿠키 또는 토큰 검증
     const { searchParams } = new URL(req.url);
     const accessToken = searchParams.get("token");
-    const isAdmin = req.headers.get("x-admin-access") === "1";
+    const isAdmin = req.headers.get("x-admin-access") === "1" || isAdminAuthenticated();
 
     if (
       !isAdmin &&

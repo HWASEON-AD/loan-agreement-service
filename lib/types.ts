@@ -197,7 +197,7 @@ export interface TaxConsultation {
   id: string;
   name: string;
   phone: string;
-  email: string;
+  email?: string;
   content: string;
   status: TaxConsultStatus;
   contactedAt: string | null;
@@ -208,7 +208,7 @@ export interface TaxConsultation {
 export interface CreateTaxConsultationInput {
   name: string;
   phone: string;
-  email: string;
+  email?: string;
   content: string;
 }
 

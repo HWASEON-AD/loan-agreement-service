@@ -133,7 +133,7 @@ export function TaxConsultTab() {
           formatDate(i.createdAt),
           i.name,
           i.phone,
-          i.email,
+          i.email ?? "",
           i.content,
           STATUS_MAP[i.status].label,
         ]
@@ -280,7 +280,7 @@ export function TaxConsultTab() {
                     {maskPhone(i.phone)}
                   </td>
                   <td className="px-4 py-3 text-slate-600">
-                    {maskEmail(i.email)}
+                    {i.email ? maskEmail(i.email) : "-"}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <span
@@ -337,7 +337,7 @@ export function TaxConsultTab() {
               </div>
               <p className="text-sm font-medium text-slate-800">{i.name}</p>
               <p className="mt-1 text-sm text-slate-600">{maskPhone(i.phone)}</p>
-              <p className="text-sm text-slate-600">{maskEmail(i.email)}</p>
+              {i.email && <p className="text-sm text-slate-600">{maskEmail(i.email)}</p>}
               <button
                 onClick={() => setDetail(i)}
                 className="mt-3 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
@@ -382,10 +382,12 @@ export function TaxConsultTab() {
                 <dt className="w-20 shrink-0 text-slate-500">연락처</dt>
                 <dd className="text-slate-800">{detail.phone}</dd>
               </div>
-              <div className="flex gap-3">
-                <dt className="w-20 shrink-0 text-slate-500">이메일</dt>
-                <dd className="text-slate-800">{detail.email}</dd>
-              </div>
+              {detail.email && (
+                <div className="flex gap-3">
+                  <dt className="w-20 shrink-0 text-slate-500">이메일</dt>
+                  <dd className="text-slate-800">{detail.email}</dd>
+                </div>
+              )}
             </dl>
             <div className="mt-4">
               <p className="mb-1 text-sm text-slate-500">상담 내용</p>

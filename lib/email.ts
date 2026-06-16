@@ -213,7 +213,7 @@ export async function sendTaxConsultNotice(
       <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;">
         <tr><td style="padding:6px 0;color:#64748b;width:90px;">이름</td><td style="padding:6px 0;font-weight:600;">${escapeHtml(consult.name)}</td></tr>
         <tr><td style="padding:6px 0;color:#64748b;">연락처</td><td style="padding:6px 0;">${escapeHtml(consult.phone)}</td></tr>
-        <tr><td style="padding:6px 0;color:#64748b;">이메일</td><td style="padding:6px 0;">${escapeHtml(consult.email)}</td></tr>
+        <tr><td style="padding:6px 0;color:#64748b;">이메일</td><td style="padding:6px 0;">${escapeHtml(consult.email ?? "-")}</td></tr>
         <tr><td style="padding:6px 0;color:#64748b;">신청일시</td><td style="padding:6px 0;">${formatKst(consult.createdAt)} KST</td></tr>
       </table>
       <div style="margin:6px 0;color:#64748b;font-size:13px;">상담 내용</div>
@@ -247,7 +247,7 @@ export async function sendTaxConsultListEmail(
           <td style="border:1px solid #e2e8f0;padding:8px;">${formatKst(c.createdAt).slice(5, 10)}</td>
           <td style="border:1px solid #e2e8f0;padding:8px;">${escapeHtml(c.name)}</td>
           <td style="border:1px solid #e2e8f0;padding:8px;">${escapeHtml(c.phone)}</td>
-          <td style="border:1px solid #e2e8f0;padding:8px;">${escapeHtml(c.email)}</td>
+          <td style="border:1px solid #e2e8f0;padding:8px;">${escapeHtml(c.email ?? "-")}</td>
           <td style="border:1px solid #e2e8f0;padding:8px;">${escapeHtml(summary)}</td>
         </tr>`;
     })

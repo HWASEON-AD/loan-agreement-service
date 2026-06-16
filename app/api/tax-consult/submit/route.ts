@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
-    if (!EMAIL_RE.test(email)) {
+    if (email && !EMAIL_RE.test(email)) {
       return NextResponse.json(
         { error: "이메일 형식이 올바르지 않습니다." },
         { status: 400 }
@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
       id: uuid(),
       name,
       phone,
-      email,
+      ...(email ? { email } : {}),
       content,
       status: "pending",
       contactedAt: null,

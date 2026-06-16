@@ -491,7 +491,7 @@ export async function createTaxConsultation(
     id: data.id,
     name: data.name,
     phone: data.phone,
-    email: data.email,
+    email: data.email ?? null,
     content: data.content,
     status: data.status,
     contacted_at: data.contactedAt,
@@ -511,6 +511,17 @@ export async function getTaxConsultations(): Promise<TaxConsultation[]> {
     .order("created_at", { ascending: false });
   if (error || !data) return [];
   return data.map(rowToTaxConsultation);
+}
+
+// 세무상담 상태 업데이트
+export async function updateTaxConsultStatus(id: string, status: string): Promise<void> {
+  const sb = getSupabaseAdmin();
+  if (!sb) { mock.updateTaxConsultStatus(id, status); return; }
+  const { error } = await sb
+    .from("tax_consultations")
+    .update({ status, ...(status === "contacted" ? { contacted_at: new Date().toISOString() } : {}) })
+    .eq("id", id);
+  if (error) throw new Error(`[db] updateTaxConsultStatus: ${error.message}`);
 }
 
 // ─────────────────────────────────────────────

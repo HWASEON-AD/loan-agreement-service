@@ -210,6 +210,13 @@ export function getTaxConsultations(): TaxConsultation[] {
   );
 }
 
+// 세무상담 상태 업데이트
+export function updateTaxConsultStatus(id: string, status: string): void {
+  const store = getStore();
+  const item = store.taxConsultations.get(id);
+  if (item) store.taxConsultations.set(id, { ...item, status: status as TaxConsultation["status"] });
+}
+
 // ---------- 만기 알림 (expiry_notifications) ----------
 
 // 특정 약정서에 대해 이미 발송한 알림 타입 목록

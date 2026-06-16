@@ -19,7 +19,7 @@ function ProblemSection() {
         </Reveal>
         <Reveal as="p" variant="fade-up" delay={80} className="mx-auto mt-4 max-w-2xl text-center text-slate-500">
           가족 간 금전 거래는 기록이 없으면 분쟁이나 조사 상황에서 사실 관계를
-          입증하기 어렵습니다. 객관적인 증거가 필요합니다.
+          입증하기 어렵습니다.<br />객관적인 증거가 필요합니다.
         </Reveal>
         <div className="mt-10 grid gap-5 sm:grid-cols-3">
           {[
