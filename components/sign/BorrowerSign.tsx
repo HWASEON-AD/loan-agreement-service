@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { StepForm } from "@/components/StepForm";
 import { Button } from "@/components/ui/Button";
 import { OtpInput } from "@/components/OtpInput";
-import { SignatureCanvasField } from "@/components/SignatureCanvas";
+import { SignatureStampField } from "@/components/SignatureStampField";
 import { AgreementPreview } from "@/components/AgreementPreview";
 import { LegalNotice } from "@/components/ui/LegalNotice";
 import { Footer } from "@/components/Footer";
@@ -149,7 +149,10 @@ export function BorrowerSign({ token }: { token: string }) {
                   <h3 className="mb-2 text-sm font-semibold text-slate-700">
                     2. 전자서명
                   </h3>
-                  <SignatureCanvasField onChange={setSignature} />
+                  <SignatureStampField
+                    onChange={setSignature}
+                    defaultName={agreement?.borrower?.name ?? ""}
+                  />
                 </div>
               )}
 

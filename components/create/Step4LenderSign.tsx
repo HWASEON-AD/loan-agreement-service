@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { StepForm } from "@/components/StepForm";
 import { Button } from "@/components/ui/Button";
 import { OtpInput } from "@/components/OtpInput";
-import { SignatureCanvasField } from "@/components/SignatureCanvas";
+import { SignatureStampField } from "@/components/SignatureStampField";
 import { LegalNotice } from "@/components/ui/LegalNotice";
 import { loadAgreementId } from "@/lib/form-store";
 
@@ -84,7 +84,7 @@ export function Step4LenderSign() {
               <h3 className="mb-2 text-sm font-semibold text-slate-700">
                 2. 전자서명
               </h3>
-              <SignatureCanvasField onChange={setSignature} />
+              <SignatureStampField onChange={setSignature} />
             </div>
 
             {error && <p className="text-sm text-red-500">{error}</p>}
