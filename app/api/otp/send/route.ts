@@ -3,10 +3,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAgreement, getAgreementByBorrowerToken } from "@/lib/db";
 import { sendOtp } from "@/lib/otp";
+import { getClientIp } from "@/lib/request-info";
+import { allowRequest } from "@/lib/rate-limit";
 import type { SignerType } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
   try {
+    // OTP 메일 반복 발송(스팸) 차단 — 정상 사용자의 재전송/NAT 공유를 고려해
+    // 10분당 10건으로 넉넉히. (당사자가 실제로 여러 번 재요청할 수 있음)
+    if (!allowRequest(`otp-send:${getClientIp(req)}`, 10, 10 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "인증코드 요청이 너무 잦습니다. 잠시 후 다시 시도해주세요." },
+        { status: 429 }
+      );
+    }
+
     const body = (await req.json()) as {
       agreementId?: string;
       signerType: SignerType;

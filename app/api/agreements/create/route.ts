@@ -4,10 +4,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { saveAgreement, saveOrder } from "@/lib/db";
 import { uuid } from "@/lib/otp";
 import { SERVICE_PRICE } from "@/lib/config";
+import { getClientIp } from "@/lib/request-info";
+import { allowRequest } from "@/lib/rate-limit";
 import type { Agreement, CreateAgreementRequest, Order } from "@/lib/types";
 
 export async function POST(req: NextRequest) {
   try {
+    // 인증 없는 생성 엔드포인트 — IP당 시간 20건으로 대량 생성 남용 차단.
+    // (같은 사무실/가정 NAT 공유를 고려해 넉넉하게 시작)
+    if (!allowRequest(`create:${getClientIp(req)}`, 20, 60 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "요청이 너무 잦습니다. 잠시 후 다시 시도해주세요." },
+        { status: 429 }
+      );
+    }
+
     const body = (await req.json()) as CreateAgreementRequest;
 
     // 필수값 검증

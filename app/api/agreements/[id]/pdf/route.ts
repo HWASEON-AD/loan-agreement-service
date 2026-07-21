@@ -26,10 +26,12 @@ export async function GET(
       );
     }
 
-    // 추가 접근 제어: 어드민 쿠키 또는 토큰 검증
+    // 추가 접근 제어: 어드민 쿠키(httpOnly 세션) 또는 서명 토큰 검증
+    //   ※ 과거의 `x-admin-access` 헤더 우회는 제거됨 — 클라이언트가 임의로 붙일 수
+    //      있어 백도어였다. 관리자 접근은 오직 admin_session 쿠키로만 인정한다.
     const { searchParams } = new URL(req.url);
     const accessToken = searchParams.get("token");
-    const isAdmin = req.headers.get("x-admin-access") === "1" || isAdminAuthenticated();
+    const isAdmin = isAdminAuthenticated();
 
     if (
       !isAdmin &&

@@ -4,12 +4,22 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAgreement, updateAgreement } from "@/lib/db";
 import { sendBorrowerSignRequest } from "@/lib/email";
 import { getBaseUrl } from "@/lib/config";
+import { getClientIp } from "@/lib/request-info";
+import { allowRequest } from "@/lib/rate-limit";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    // 차용자에게 실제 이메일을 보내는 경로 — 피싱/스팸 남용 차단(IP당 시간 20건).
+    if (!allowRequest(`request-borrower:${getClientIp(req)}`, 20, 60 * 60 * 1000)) {
+      return NextResponse.json(
+        { error: "요청이 너무 잦습니다. 잠시 후 다시 시도해주세요." },
+        { status: 429 }
+      );
+    }
+
     const agreement = await getAgreement(params.id);
     if (!agreement) {
       return NextResponse.json(
