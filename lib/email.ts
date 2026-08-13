@@ -331,6 +331,34 @@ export async function sendExpiryNoticeEmail(
   await send(agreement.lender.email, v.subject, html);
 }
 
+// 계약갱신 요구 통지서 이메일 — 임차인이 임대인(또는 본인 사본)에게 직접 보낸다.
+//
+// ★ 이 함수는 통지서 '전송'만 한다. 본문은 이용자가 입력한 값을 서식에 그대로 배치한 결과이고,
+//   서버는 내용을 저장하지 않는다(생성 문서 DB 미보관 원칙).
+// ⚠️ 이메일은 도달 증명 수단이 아니다 — 도달주의(민법 111조)상 다툼이 생기면
+//   내용증명+배달증명이 필요하다는 안내를 본문 하단에 함께 넣는다.
+export async function sendRenewalNoticeEmail(
+  to: string,
+  subject: string,
+  noticeText: string
+): Promise<void> {
+  const html = `
+    <div style="font-family:sans-serif;max-width:640px;margin:0 auto;padding:24px;">
+      <pre style="white-space:pre-wrap;font-family:'Malgun Gothic',sans-serif;font-size:14px;line-height:1.8;color:#1e293b;margin:0;">${escapeHtml(
+        noticeText
+      )}</pre>
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:28px 0 14px;"/>
+      <p style="color:#94a3b8;font-size:12px;line-height:1.7;margin:0;">
+        본 메일은 발신인이 ${SERVICE_NAME}의 서식 작성 기능을 이용하여 직접 작성·발송한 통지입니다.<br/>
+        ${SERVICE_NAME}는 변호사·법무사가 아니며 법률사무를 취급하지 않습니다.<br/>
+        전자우편은 도달 사실을 증명하는 수단이 아닙니다. 도달 증명이 필요한 경우
+        내용증명·배달증명 우편을 이용하시기 바랍니다.
+      </p>
+    </div>
+  `;
+  await send(to, subject, html);
+}
+
 // 천 단위 콤마 (이메일 본문용 — interest-calc 의존성 없이 간단 처리)
 function comma(n: number): string {
   return n.toLocaleString("ko-KR");
