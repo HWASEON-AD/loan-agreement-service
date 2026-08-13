@@ -113,6 +113,8 @@ export function RenewalForm() {
   const [sending, setSending] = useState(false);
   const [sendMsg, setSendMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+  const [pdfErr, setPdfErr] = useState("");
 
   // 계산 — 순수 함수. 판정하지 않고 날짜만 낸다.
   const win = useMemo(
@@ -197,6 +199,36 @@ export function RenewalForm() {
     await navigator.clipboard.writeText(smsText);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  }
+
+  // PDF 다운로드 — 서버에서 한글 폰트를 임베드해 만들고, 저장 없이 그대로 내려받는다.
+  async function handleDownloadPdf() {
+    setDownloading(true);
+    setPdfErr("");
+    try {
+      const res = await fetch("/api/renewal/pdf", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noticeText, dateYmd: notice.noticeDate }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        throw new Error(data?.error || "PDF 생성에 실패했습니다.");
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `계약갱신요구통지서_${notice.noticeDate.replace(/-/g, "")}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setPdfErr(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDownloading(false);
+    }
   }
 
   const checks = [
@@ -506,8 +538,10 @@ export function RenewalForm() {
         {/* ── 계산 결과 (법령정보형 출력. 결론·배지 금지) */}
         {win && (
           <div className="rounded-2xl border border-brand-200 bg-brand-50 p-6 shadow-sm">
+            {/* 근거 조문 표기 — 기간 자체는 제6조 제1항 전단이 정하고 제6조의3 제1항이 이를 인용한다.
+                (법제처 생활법령정보의 인용 방식과 동일하게 맞췄다) */}
             <h2 className="text-base font-bold text-brand-900">
-              주택임대차보호법 제6조의3 제1항이 정한 계약갱신요구 기간
+              주택임대차보호법 제6조의3 제1항 본문 · 제6조 제1항 전단이 정한 계약갱신요구 기간
             </h2>
 
             <div className="mt-4 rounded-xl bg-white p-4">
@@ -578,13 +612,20 @@ export function RenewalForm() {
             <SectionTitle no={6}>보내기</SectionTitle>
             <div className="space-y-5">
               <div className="flex flex-wrap gap-2">
-                <Button variant="primary" onClick={() => window.print()}>
-                  인쇄 · PDF로 저장
+                <Button variant="primary" onClick={handleDownloadPdf} disabled={downloading}>
+                  {downloading ? "PDF 만드는 중..." : "PDF 다운로드"}
+                </Button>
+                <Button variant="outline" onClick={() => window.print()}>
+                  인쇄
                 </Button>
                 <Button variant="outline" onClick={handleCopy}>
                   {copied ? "복사되었습니다" : "문자·카톡용 텍스트 복사"}
                 </Button>
               </div>
+
+              {pdfErr && (
+                <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{pdfErr}</p>
+              )}
 
               <p className="rounded-xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">
                 문자·카카오톡으로 보낼 때는{" "}

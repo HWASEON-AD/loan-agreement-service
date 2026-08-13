@@ -1,6 +1,7 @@
 {
   "crons": [
     { "path": "/api/cron/expiry-check", "schedule": "0 1 * * *" },
-    { "path": "/api/cron/interest-reminder", "schedule": "0 1 * * *" }
+    { "path": "/api/cron/interest-reminder", "schedule": "0 1 * * *" },
+    { "path": "/api/cron/law-check", "schedule": "0 20 * * *" }
   ]
 }
