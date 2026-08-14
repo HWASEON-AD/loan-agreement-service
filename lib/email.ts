@@ -331,6 +331,67 @@ export async function sendExpiryNoticeEmail(
   await send(agreement.lender.email, v.subject, html);
 }
 
+// 계약갱신 요구 통지서 이메일 — 임차인이 임대인(또는 본인 사본)에게 직접 보낸다.
+//
+// ★ 이 함수는 통지서 '전송'만 한다. 본문은 이용자가 입력한 값을 서식에 그대로 배치한 결과이고,
+//   서버는 내용을 저장하지 않는다(생성 문서 DB 미보관 원칙).
+// ⚠️ 이메일은 도달 증명 수단이 아니다 — 도달주의(민법 111조)상 다툼이 생기면
+//   내용증명+배달증명이 필요하다는 안내를 본문 하단에 함께 넣는다.
+export async function sendRenewalNoticeEmail(
+  to: string,
+  subject: string,
+  noticeText: string
+): Promise<void> {
+  const html = `
+    <div style="font-family:sans-serif;max-width:640px;margin:0 auto;padding:24px;">
+      <pre style="white-space:pre-wrap;font-family:'Malgun Gothic',sans-serif;font-size:14px;line-height:1.8;color:#1e293b;margin:0;">${escapeHtml(
+        noticeText
+      )}</pre>
+      <hr style="border:none;border-top:1px solid #e2e8f0;margin:28px 0 14px;"/>
+      <p style="color:#94a3b8;font-size:12px;line-height:1.7;margin:0;">
+        본 메일은 발신인이 ${SERVICE_NAME}의 서식 작성 기능을 이용하여 직접 작성·발송한 통지입니다.<br/>
+        ${SERVICE_NAME}는 변호사·법무사가 아니며 법률사무를 취급하지 않습니다.<br/>
+        전자우편은 도달 사실을 증명하는 수단이 아닙니다. 도달 증명이 필요한 경우
+        내용증명·배달증명 우편을 이용하시기 바랍니다.
+      </p>
+    </div>
+  `;
+  await send(to, subject, html);
+}
+
+// 법령 감시 알림 — 개정 감지 또는 확인 연속 실패 시 관리자에게 발송.
+// ★ 자동 반영은 하지 않는다. 계산 로직·경과규정은 사람이 검토해야 한다.
+export async function sendLawWatchAlert(payload: {
+  kind: "changed" | "failed";
+  title: string;
+  lines: string[];
+  url: string;
+}): Promise<void> {
+  const isChanged = payload.kind === "changed";
+  const accent = isChanged ? "#b45309" : "#b91c1c";
+  const html = `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;padding:24px;">
+      <h2 style="color:${accent};margin:0 0 12px;">[${SERVICE_NAME}] ${escapeHtml(payload.title)}</h2>
+      <ul style="font-size:14px;color:#334155;line-height:1.8;padding-left:18px;margin:0 0 18px;">
+        ${payload.lines.map((l) => `<li>${escapeHtml(l)}</li>`).join("")}
+      </ul>
+      <p style="margin:0 0 18px;">
+        <a href="${payload.url}" style="display:inline-block;padding:10px 18px;background:#1d4ed8;color:#fff;border-radius:8px;text-decoration:none;font-size:13px;">
+          법제처에서 원문 확인하기
+        </a>
+      </p>
+      <p style="color:#94a3b8;font-size:12px;line-height:1.7;margin:0;">
+        ${
+          isChanged
+            ? "계약갱신 요구 통지서 기능의 행사기간 계산(lib/renewal-calc.ts)과 경과규정 분기를 검토해 주세요. 시스템은 법령을 자동으로 반영하지 않습니다."
+            : "법제처 페이지 구조 변경 가능성이 있습니다. 확인이 실패하는 동안에는 화면의 '최종 확인일'이 갱신되지 않습니다."
+        }
+      </p>
+    </div>
+  `;
+  await send(ADMIN_EMAIL, `[${SERVICE_NAME}] ${payload.title}`, html);
+}
+
 // 천 단위 콤마 (이메일 본문용 — interest-calc 의존성 없이 간단 처리)
 function comma(n: number): string {
   return n.toLocaleString("ko-KR");

@@ -12,7 +12,11 @@ import type { Agreement, SignatureRecord } from "./types";
 import { buildAgreementText } from "./agreement-text";
 
 // 한글 폰트 경로 (로컬 개발용)
-const FONT_PATH = path.join(process.cwd(), "public", "fonts", "NotoSansKR-Regular.otf");
+// 🚨 반드시 **TTF** 를 쓸 것. NotoSansKR-Regular.otf(CFF) 를 쓰면 한글이 엉뚱한 한자로 깨진다.
+//    pdf-lib(fontkit)이 CJK OTF 를 제대로 임베드하지 못한다. (2026-08-13 실측으로 확인)
+//    subset:true 도 글리프를 흘리므로 subset:false 를 유지할 것.
+//    NanumGothic 은 SIL OFL 이라 PDF 임베드·재배포가 자유롭다.
+const FONT_PATH = path.join(process.cwd(), "public", "fonts", "NanumGothic-Regular.ttf");
 const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 
 // 폰트 바이트 캐시
@@ -26,7 +30,7 @@ async function loadFontBytes(): Promise<Uint8Array | null> {
     return cachedFontBytes;
   } catch { /* ignored */ }
   try {
-    const res = await fetch(`${BASE_URL}/fonts/NotoSansKR-Regular.otf`);
+    const res = await fetch(`${BASE_URL}/fonts/NanumGothic-Regular.ttf`);
     if (res.ok) {
       cachedFontBytes = new Uint8Array(await res.arrayBuffer());
       return cachedFontBytes;
