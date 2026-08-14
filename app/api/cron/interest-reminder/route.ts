@@ -97,3 +97,10 @@ export async function POST(req: NextRequest) {
     );
   }
 }
+
+// ★ Vercel Cron 은 **GET** 으로 호출한다. POST 만 있으면 405 로 조용히 실패한다.
+//   (2026-08-13 확인: vercel.json 에 등록돼 있는데도 POST 만 export 되어 있었다)
+//   기존 로직은 그대로 두고 GET 을 POST 로 위임한다.
+export async function GET(req: NextRequest) {
+  return POST(req);
+}
