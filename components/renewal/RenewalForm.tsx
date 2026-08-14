@@ -1,6 +1,9 @@
 "use client";
 
-// 계약갱신 요구 통지서 작성 폼 — 한 페이지 완결형
+// 계약갱신 서식 만들기 — 한 페이지 완결형
+//
+//   ① 계약갱신 요구 통지서   : 임차인 → 임대인 (제6조의3 갱신요구권 행사)
+//   ② 주택임대차계약 갱신 확인서 : 임대인·임차인 공용 (양 당사자 서명)
 //
 // ★★ 절대 금지 (Fable 법률 검토 반영) — 수정 시 반드시 지킬 것
 //   1. LLM/AI 호출 0회. 문구 다듬기·"더 정중하게" 버튼도 금지.
@@ -11,12 +14,23 @@
 //   5. 변호사 연결·검토 버튼 금지 (변호사법 34조). 특정 사무소 소개 불가.
 //   6. 무료 유지. 구독 혜택 목록·가격표에 이 기능을 넣지 말 것.
 //   7. 생성 문서를 DB에 저장하지 말 것 (실명·주소가 들어간다).
+//
+// ★★ 확인서(②)에 대한 추가 금지 — 2026-08-15 법률검토
+//   8. 「임대인용 갱신 통지서」를 만들지 말 것. 제6조의3의 갱신요구권은 임차인의 형성권이라
+//      임대인 명의로 "갱신을 요구합니다"라고 쓰면 법적으로 무의미한 의사표시가 되고,
+//      문서 전체의 신빙성이 깎여 오히려 작성자에게 불리하다. 확인서는 반드시 **양 당사자 서명**.
+//   9. 확인서 문안은 **과거 사실의 확인**이어야 하고 **간주 합의**여서는 안 된다.
+//      (실제로 갱신요구가 없었는데 "행사한 것으로 본다"는 서명을 받으면 임차인에게 불리한
+//       약정이 되어 법 제10조 편면적 강행규정으로 무효가 될 소지)
+//  10. "이로써 갱신요구권은 소진되었습니다" 를 서비스가 자동 삽입하지 말 것.
+//  11. 갱신거절 통지서 등 '거절' 계열 서식은 범위 밖 (9개 사유 선택 UI 자체가 자가진단이 된다).
 
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { LegalNotice } from "@/components/ui/LegalNotice";
+import { FormDocument } from "@/components/renewal/FormDocument";
 import {
   calcRenewalWindow,
   calcMaxIncrease,
@@ -26,7 +40,14 @@ import {
   todayKst,
 } from "@/lib/renewal-calc";
 import {
-  buildRenewalNoticeText,
+  buildFormDoc,
+  docTitleOf,
+  renderDocAsText,
+  type DocKind,
+} from "@/lib/renewal-doc";
+import {
+  buildRenewalConfirmSms,
+  buildRenewalConfirmSubject,
   buildRenewalNoticeSms,
   buildRenewalNoticeSubject,
   type RenewalNotice,
@@ -79,6 +100,10 @@ function ChoiceButton({
 }
 
 export function RenewalForm() {
+  // 0. 서식 종류
+  const [kind, setKind] = useState<DocKind>("notice");
+  const isConfirm = kind === "confirm";
+
   // 1. 계약 정보
   const [propertyAddress, setPropertyAddress] = useState("");
   const [periodOrigin, setPeriodOrigin] = useState<"new" | "exercised" | "implied">("new");
@@ -97,15 +122,24 @@ export function RenewalForm() {
   const [tenantAddress, setTenantAddress] = useState("");
   const [landlordName, setLandlordName] = useState("");
   const [landlordAddress, setLandlordAddress] = useState("");
+  const [landlordPhone, setLandlordPhone] = useState("");
   const [ownerChanged, setOwnerChanged] = useState(false);
 
-  // 4. 갱신 조건
+  // 4. 갱신 조건 (통지서)
   const [condition, setCondition] = useState<"same" | "negotiate">("same");
 
-  // 5. 확인 3개
+  // 4'. 갱신 내용 (확인서) — 비워두면 아래 derived 기본값이 들어간다
+  const [renewalRequestDate, setRenewalRequestDate] = useState("");
+  const [renewedStart, setRenewedStart] = useState("");
+  const [renewedEnd, setRenewedEnd] = useState("");
+  const [renewedDeposit, setRenewedDeposit] = useState("");
+  const [renewedMonthlyRent, setRenewedMonthlyRent] = useState("");
+
+  // 5. 확인
   const [ckResidential, setCkResidential] = useState(false);
   const [ckNotUsed, setCkNotUsed] = useState(false);
   const [ckFromContract, setCkFromContract] = useState(false);
+  const [ckRequested, setCkRequested] = useState(false);
 
   // 6. 보내기
   const [mailTo, setMailTo] = useState("");
@@ -116,10 +150,20 @@ export function RenewalForm() {
   const [downloading, setDownloading] = useState(false);
   const [pdfErr, setPdfErr] = useState("");
 
-  // 계산 — 순수 함수. 판정하지 않고 날짜만 낸다.
+  // 갱신 후 기간·금액의 기본값.
+  // ★ 만료일 자체는 절대 계산해 주지 않는다(계약서마다 표기가 달라 하루가 어긋난다).
+  //   여기서 채우는 건 이미 확정된 만료일에 법 제6조의3 제2항의 "2년"을 더하는 기계적 계산이며,
+  //   두 칸 모두 이용자가 계약서를 보고 고칠 수 있게 열어 둔다.
+  const derivedRenewedStart = renewedStart || endDate;
+  const derivedRenewedEnd =
+    renewedEnd || (derivedRenewedStart ? calcRenewedEndDate(derivedRenewedStart) : "");
+  const derivedRenewedDeposit = renewedDeposit || deposit;
+  const derivedRenewedMonthlyRent = renewedMonthlyRent || monthlyRent;
+
+  // 계산 — 순수 함수. 판정하지 않고 날짜만 낸다. (확인서는 이미 갱신된 뒤의 문서라 계산하지 않는다)
   const win = useMemo(
-    () => (endDate ? calcRenewalWindow(endDate, contractSignDate) : null),
-    [endDate, contractSignDate]
+    () => (!isConfirm && endDate ? calcRenewalWindow(endDate, contractSignDate) : null),
+    [isConfirm, endDate, contractSignDate]
   );
 
   const months = useMemo(
@@ -140,21 +184,39 @@ export function RenewalForm() {
       tenantAddress: tenantAddress || propertyAddress,
       landlordName,
       landlordAddress,
+      landlordPhone,
       condition,
       noticeDate: todayKst(),
+      renewalRequestDate,
+      renewedStartDate: derivedRenewedStart,
+      renewedEndDate: derivedRenewedEnd,
+      renewedDeposit: Number(onlyDigits(derivedRenewedDeposit) || 0),
+      renewedMonthlyRent: Number(onlyDigits(derivedRenewedMonthlyRent) || 0),
     }),
     [
       propertyAddress, startDate, endDate, hasMonthlyRent, deposit, monthlyRent,
-      tenantName, tenantPhone, tenantAddress, landlordName, landlordAddress, condition,
+      tenantName, tenantPhone, tenantAddress, landlordName, landlordAddress, landlordPhone,
+      condition, renewalRequestDate, derivedRenewedStart, derivedRenewedEnd,
+      derivedRenewedDeposit, derivedRenewedMonthlyRent,
     ]
   );
 
-  const noticeText = useMemo(() => buildRenewalNoticeText(notice), [notice]);
-  const smsText = useMemo(() => buildRenewalNoticeSms(notice), [notice]);
+  const doc = useMemo(() => buildFormDoc(kind, notice), [kind, notice]);
+  const docText = useMemo(() => renderDocAsText(doc), [doc]);
+  const smsText = useMemo(
+    () => (isConfirm ? buildRenewalConfirmSms(notice) : buildRenewalNoticeSms(notice)),
+    [isConfirm, notice]
+  );
+  const subject = useMemo(
+    () => (isConfirm ? buildRenewalConfirmSubject(notice) : buildRenewalNoticeSubject(notice)),
+    [isConfirm, notice]
+  );
 
-  const requiredFilled = Boolean(
+  const baseFilled = Boolean(
     propertyAddress && startDate && endDate && tenantName && landlordName && deposit
   );
+  const confirmFilled = Boolean(renewalRequestDate && derivedRenewedStart && derivedRenewedEnd);
+  const requiredFilled = isConfirm ? baseFilled && confirmFilled : baseFilled;
   // 주거용 확인은 '서식의 전제'이므로 게이트. (법적 판정이 아니라 제품 사양으로 둔다)
   const canBuild = requiredFilled && ckResidential;
 
@@ -162,7 +224,7 @@ export function RenewalForm() {
     if (!mailTo) return;
     if (
       !confirm(
-        `아래 주소로 통지서를 보냅니다.\n\n받는 사람: ${mailTo}\n${
+        `아래 주소로 ${docTitleOf(kind)}를 보냅니다.\n\n받는 사람: ${mailTo}\n${
           mailCc ? `사본: ${mailCc}\n` : ""
         }\n주소가 정확한지 확인해 주세요.`
       )
@@ -175,12 +237,7 @@ export function RenewalForm() {
       const res = await fetch("/api/renewal/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: mailTo,
-          cc: mailCc,
-          subject: buildRenewalNoticeSubject(notice),
-          noticeText,
-        }),
+        body: JSON.stringify({ to: mailTo, cc: mailCc, subject, noticeText: docText }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "발송에 실패했습니다.");
@@ -209,7 +266,7 @@ export function RenewalForm() {
       const res = await fetch("/api/renewal/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ noticeText, dateYmd: notice.noticeDate }),
+        body: JSON.stringify({ doc, dateYmd: notice.noticeDate }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -219,7 +276,10 @@ export function RenewalForm() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `계약갱신요구통지서_${notice.noticeDate.replace(/-/g, "")}.pdf`;
+      a.download = `${docTitleOf(kind).replace(/\s/g, "")}_${notice.noticeDate.replace(
+        /-/g,
+        ""
+      )}.pdf`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -231,6 +291,8 @@ export function RenewalForm() {
     }
   }
 
+  // 확인 항목 — 전부 "~임을 확인합니다"(이용자 선언) 형식이다.
+  // 사실 질문("연체 있습니까?")으로 만들면 답을 받아 우리가 포섭 판단한 구조가 되므로 금지.
   const checks = [
     {
       checked: ckResidential,
@@ -238,12 +300,23 @@ export function RenewalForm() {
       text: "임차한 건물을 주로 주거 목적으로 사용하고 있음을 확인합니다.",
       sub: "주택임대차보호법은 주거용 건물의 임대차에 적용됩니다(법 제2조). 오피스텔 등 겸용 건물은 사안마다 결론이 다르며, 이 확인은 이용자 본인의 판단입니다.",
     },
-    {
-      checked: ckNotUsed,
-      set: setCkNotUsed,
-      text: "이 주택에 관하여 과거에 계약갱신요구권을 행사하여 갱신한 적이 없음을 확인합니다.",
-      sub: "합의에 의한 재계약이나 묵시적 갱신은 여기의 ‘행사’에 포함되지 않는다는 것이 국토교통부 해설의 입장입니다.",
-    },
+    ...(isConfirm
+      ? [
+          {
+            checked: ckRequested,
+            set: setCkRequested,
+            text: "임차인이 위 ‘계약갱신 요구일’에 임대인에게 계약갱신 요구의 의사를 표시하였음을 확인합니다.",
+            sub: "이 확인서는 실제로 있었던 갱신 요구를 기록하는 문서입니다. 갱신 요구가 없었던 경우를 ‘있었던 것으로’ 적는 용도가 아닙니다.",
+          },
+        ]
+      : [
+          {
+            checked: ckNotUsed,
+            set: setCkNotUsed,
+            text: "이 주택에 관하여 과거에 계약갱신요구권을 행사하여 갱신한 적이 없음을 확인합니다.",
+            sub: "합의에 의한 재계약이나 묵시적 갱신은 여기의 ‘행사’에 포함되지 않는다는 것이 국토교통부 해설의 입장입니다.",
+          },
+        ]),
     {
       checked: ckFromContract,
       set: setCkFromContract,
@@ -256,9 +329,49 @@ export function RenewalForm() {
     <>
       {/* ── 입력 영역 (인쇄 시 숨김) */}
       <div className="space-y-5 print:hidden">
-        {/* 1. 계약 정보 */}
+        {/* 0. 서식 종류 */}
         <Card>
-          <SectionTitle no={1}>계약 정보</SectionTitle>
+          <SectionTitle no={1}>어떤 서식을 만드시나요?</SectionTitle>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <ChoiceButton
+              active={!isConfirm}
+              label="계약갱신 요구 통지서"
+              sub="임차인 → 임대인 · 갱신을 요구할 때"
+              onClick={() => setKind("notice")}
+            />
+            <ChoiceButton
+              active={isConfirm}
+              label="주택임대차계약 갱신 확인서"
+              sub="임대인·임차인 공용 · 갱신된 뒤 기록으로 남길 때"
+              onClick={() => setKind("confirm")}
+            />
+          </div>
+
+          {isConfirm && (
+            <div className="mt-4 space-y-3">
+              <LegalNotice tone="info" title="이 서식은 양 당사자가 함께 서명합니다">
+                <p className="text-sm leading-relaxed">
+                  이번 갱신이 <b>주택임대차보호법 제6조의3에 따른 갱신요구권 행사에 의한 갱신</b>
+                  이었다는 사실을 임대인과 임차인이 함께 확인하는 서식입니다. 한쪽이 일방적으로
+                  보내는 통지가 아니라, 두 사람이 각각 서명·날인합니다.
+                </p>
+                <p className="mt-2 text-sm leading-relaxed">
+                  같은 법 제6조의3은 <b>임차인</b>에게 계약갱신을 요구할 권리를 정하고 있습니다.
+                  임대인 명의로 &lsquo;갱신을 요구한다&rsquo;고 적는 서식은 제공하지 않습니다.
+                </p>
+              </LegalNotice>
+              <LegalNotice tone="warn">
+                이 확인서는 <b>실제로 있었던 갱신 요구를 기록</b>하는 문서입니다. 갱신 요구가 없었던
+                경우까지 &lsquo;있었던 것으로&rsquo; 적기 위한 용도가 아닙니다. 법 제10조는 이 법에
+                위반된 약정으로서 임차인에게 불리한 것은 효력이 없다고 정하고 있습니다.
+              </LegalNotice>
+            </div>
+          )}
+        </Card>
+
+        {/* 2. 계약 정보 */}
+        <Card>
+          <SectionTitle no={2}>계약 정보</SectionTitle>
           <div className="space-y-5">
             <Input
               label="임차주택 소재지"
@@ -268,60 +381,64 @@ export function RenewalForm() {
               placeholder="서울시 ○○구 ○○로 12, 101동 502호"
             />
 
-            <div>
-              <p className="mb-2 text-sm font-medium text-slate-700">
-                현재 살고 있는 임대차기간은 어떻게 시작되었나요?
-              </p>
-              <div className="grid gap-2 sm:grid-cols-3">
-                <ChoiceButton
-                  active={periodOrigin === "new"}
-                  label="새로 계약서를 씀"
-                  sub="신규 체결 또는 재계약"
-                  onClick={() => setPeriodOrigin("new")}
-                />
-                <ChoiceButton
-                  active={periodOrigin === "exercised"}
-                  label="갱신요구권을 행사함"
-                  sub="권리를 써서 갱신"
-                  onClick={() => setPeriodOrigin("exercised")}
-                />
-                <ChoiceButton
-                  active={periodOrigin === "implied"}
-                  label="통지 없이 계속 거주"
-                  sub="묵시적 갱신에 해당할 수 있음"
-                  onClick={() => setPeriodOrigin("implied")}
-                />
-              </div>
+            {!isConfirm && (
+              <div>
+                <p className="mb-2 text-sm font-medium text-slate-700">
+                  현재 살고 있는 임대차기간은 어떻게 시작되었나요?
+                </p>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <ChoiceButton
+                    active={periodOrigin === "new"}
+                    label="새로 계약서를 씀"
+                    sub="신규 체결 또는 재계약"
+                    onClick={() => setPeriodOrigin("new")}
+                  />
+                  <ChoiceButton
+                    active={periodOrigin === "exercised"}
+                    label="갱신요구권을 행사함"
+                    sub="권리를 써서 갱신"
+                    onClick={() => setPeriodOrigin("exercised")}
+                  />
+                  <ChoiceButton
+                    active={periodOrigin === "implied"}
+                    label="통지 없이 계속 거주"
+                    sub="묵시적 갱신에 해당할 수 있음"
+                    onClick={() => setPeriodOrigin("implied")}
+                  />
+                </div>
 
-              {periodOrigin === "implied" && (
-                <div className="mt-3">
-                  <LegalNotice tone="info">
-                    통지 없이 기간이 지나 계속 거주하는 경우(묵시적 갱신)는 갱신요구권을{" "}
-                    <b>행사한 것에 포함되지 않는다</b>는 것이 국토교통부 해설의 입장입니다.
-                    아래 ‘계약서 작성일’에는 종전 기간이 끝난 <b>다음 날</b>을, 만료일에는 종전
-                    만료일에 2년을 더한 날짜를 확인 후 입력해 주세요.
-                  </LegalNotice>
-                </div>
-              )}
-              {periodOrigin === "exercised" && (
-                <div className="mt-3">
-                  <LegalNotice tone="warn">
-                    법 제6조의3 제2항은 갱신요구권을 1회에 한하여 행사할 수 있다고 정합니다.
-                    과거 갱신이 ‘갱신요구권 행사’였는지 ‘합의에 의한 재계약’이었는지는 계약서·문자
-                    기록에 따라 달라지며, 본 서비스는 이를 판단하지 않습니다.
-                  </LegalNotice>
-                </div>
-              )}
-            </div>
+                {periodOrigin === "implied" && (
+                  <div className="mt-3">
+                    <LegalNotice tone="info">
+                      통지 없이 기간이 지나 계속 거주하는 경우(묵시적 갱신)는 갱신요구권을{" "}
+                      <b>행사한 것에 포함되지 않는다</b>는 것이 국토교통부 해설의 입장입니다.
+                      아래 ‘계약서 작성일’에는 종전 기간이 끝난 <b>다음 날</b>을, 만료일에는 종전
+                      만료일에 2년을 더한 날짜를 확인 후 입력해 주세요.
+                    </LegalNotice>
+                  </div>
+                )}
+                {periodOrigin === "exercised" && (
+                  <div className="mt-3">
+                    <LegalNotice tone="warn">
+                      법 제6조의3 제2항은 갱신요구권을 1회에 한하여 행사할 수 있다고 정합니다.
+                      과거 갱신이 ‘갱신요구권 행사’였는지 ‘합의에 의한 재계약’이었는지는 계약서·문자
+                      기록에 따라 달라지며, 본 서비스는 이를 판단하지 않습니다.
+                    </LegalNotice>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <Input
-                label="현재 계약서 작성(서명)일"
-                hint="갱신·재계약을 했다면 가장 최근 갱신 계약일"
-                type="date"
-                value={contractSignDate}
-                onChange={(e) => setContractSignDate(e.target.value)}
-              />
+              {!isConfirm && (
+                <Input
+                  label="현재 계약서 작성(서명)일"
+                  hint="갱신·재계약을 했다면 가장 최근 갱신 계약일"
+                  type="date"
+                  value={contractSignDate}
+                  onChange={(e) => setContractSignDate(e.target.value)}
+                />
+              )}
               <Input
                 label="임대차기간 시작일"
                 hint="계약서 ‘임대차기간’ 칸의 앞 날짜"
@@ -333,7 +450,7 @@ export function RenewalForm() {
 
             <div className="rounded-xl border-2 border-brand-200 bg-brand-50/50 p-4">
               <Input
-                label="임대차기간 만료일"
+                label={isConfirm ? "종전 임대차기간 만료일" : "임대차기간 만료일"}
                 hint="직접 계산하지 말고, 계약서에 인쇄된 종료일을 그대로 옮겨 적어주세요. 입주일·잔금일과 다를 수 있습니다."
                 type="date"
                 value={endDate}
@@ -352,9 +469,9 @@ export function RenewalForm() {
           </div>
         </Card>
 
-        {/* 2. 보증금 · 차임 */}
+        {/* 3. 보증금 · 차임 */}
         <Card>
-          <SectionTitle no={2}>보증금 · 차임</SectionTitle>
+          <SectionTitle no={3}>{isConfirm ? "종전 보증금 · 차임" : "보증금 · 차임"}</SectionTitle>
           <div className="space-y-5">
             <div className="inline-flex w-full rounded-xl bg-slate-100 p-1 sm:w-auto">
               <button
@@ -423,9 +540,9 @@ export function RenewalForm() {
           </div>
         </Card>
 
-        {/* 3. 당사자 */}
+        {/* 4. 당사자 */}
         <Card>
-          <SectionTitle no={3}>당사자</SectionTitle>
+          <SectionTitle no={4}>당사자</SectionTitle>
           <div className="space-y-5">
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
@@ -443,28 +560,30 @@ export function RenewalForm() {
 
             <Input
               label="임차인 주소"
-              hint="비워두면 임차주택 주소가 발신인 주소로 들어갑니다"
+              hint="비워두면 임차주택 주소가 들어갑니다"
               value={tenantAddress}
               onChange={(e) => setTenantAddress(e.target.value)}
             />
 
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-4">
-              <input
-                type="checkbox"
-                className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
-                checked={ownerChanged}
-                onChange={(e) => setOwnerChanged(e.target.checked)}
-              />
-              <span className="text-sm leading-relaxed text-slate-800">
-                계약 후 <b>집주인이 바뀌었습니다</b>
-                {ownerChanged && (
-                  <span className="mt-1 block text-xs text-slate-600">
-                    통지는 현재 등기부상 소유자에게 보내는 것이 일반적입니다. 소유자는
-                    인터넷등기소에서 확인할 수 있습니다.
-                  </span>
-                )}
-              </span>
-            </label>
+            {!isConfirm && (
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-slate-50 p-4">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 h-4 w-4 shrink-0 accent-brand-600"
+                  checked={ownerChanged}
+                  onChange={(e) => setOwnerChanged(e.target.checked)}
+                />
+                <span className="text-sm leading-relaxed text-slate-800">
+                  계약 후 <b>집주인이 바뀌었습니다</b>
+                  {ownerChanged && (
+                    <span className="mt-1 block text-xs text-slate-600">
+                      통지는 현재 등기부상 소유자에게 보내는 것이 일반적입니다. 소유자는
+                      인터넷등기소에서 확인할 수 있습니다.
+                    </span>
+                  )}
+                </span>
+              </label>
+            )}
 
             <div className="grid gap-4 sm:grid-cols-2">
               <Input
@@ -473,37 +592,102 @@ export function RenewalForm() {
                 onChange={(e) => setLandlordName(e.target.value)}
               />
               <Input
-                label="임대인 주소"
-                hint="우편으로 보낼 때 필요합니다"
-                value={landlordAddress}
-                onChange={(e) => setLandlordAddress(e.target.value)}
+                label="임대인 연락처"
+                value={landlordPhone}
+                onChange={(e) => setLandlordPhone(e.target.value)}
+                placeholder="010-0000-0000"
               />
             </div>
-          </div>
-        </Card>
 
-        {/* 4. 갱신 조건 */}
-        <Card>
-          <SectionTitle no={4}>갱신 조건</SectionTitle>
-          <div className="grid gap-2 sm:grid-cols-2">
-            <ChoiceButton
-              active={condition === "same"}
-              label="종전과 동일한 조건으로 갱신 요구"
-              sub="기본"
-              onClick={() => setCondition("same")}
-            />
-            <ChoiceButton
-              active={condition === "negotiate"}
-              label="조건은 협의 희망"
-              sub="갱신 요구 자체는 동일하게 유지됩니다"
-              onClick={() => setCondition("negotiate")}
+            <Input
+              label="임대인 주소"
+              hint="우편으로 보낼 때 필요합니다"
+              value={landlordAddress}
+              onChange={(e) => setLandlordAddress(e.target.value)}
             />
           </div>
         </Card>
 
-        {/* 5. 확인 */}
+        {/* 5. 갱신 조건 (통지서) / 갱신 내용 (확인서) */}
+        {!isConfirm ? (
+          <Card>
+            <SectionTitle no={5}>갱신 조건</SectionTitle>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <ChoiceButton
+                active={condition === "same"}
+                label="종전과 동일한 조건으로 갱신 요구"
+                sub="기본"
+                onClick={() => setCondition("same")}
+              />
+              <ChoiceButton
+                active={condition === "negotiate"}
+                label="조건은 협의 희망"
+                sub="갱신 요구 자체는 동일하게 유지됩니다"
+                onClick={() => setCondition("negotiate")}
+              />
+            </div>
+          </Card>
+        ) : (
+          <Card>
+            <SectionTitle no={5}>갱신 내용</SectionTitle>
+            <div className="space-y-5">
+              <div className="rounded-xl border-2 border-brand-200 bg-brand-50/50 p-4">
+                <Input
+                  label="계약갱신 요구일"
+                  hint="임차인이 실제로 갱신 요구의 의사를 표시한 날(문자·카톡·통지서를 보낸 날 등)을 적어주세요."
+                  type="date"
+                  value={renewalRequestDate}
+                  onChange={(e) => setRenewalRequestDate(e.target.value)}
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  label="갱신 후 임대차기간 시작일"
+                  hint="계약서 표기 방식에 따라 종전 만료일 당일 또는 그 다음 날로 적습니다. 확인 후 고쳐주세요."
+                  type="date"
+                  value={derivedRenewedStart}
+                  onChange={(e) => setRenewedStart(e.target.value)}
+                />
+                <Input
+                  label="갱신 후 임대차기간 만료일"
+                  hint="법 제6조의3 제2항의 존속기간 2년을 시작일에 더한 날짜가 기본값입니다."
+                  type="date"
+                  value={derivedRenewedEnd}
+                  onChange={(e) => setRenewedEnd(e.target.value)}
+                />
+              </div>
+
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Input
+                  label="갱신 후 보증금 (원)"
+                  hint="종전과 같으면 그대로 두세요"
+                  inputMode="numeric"
+                  value={comma(derivedRenewedDeposit)}
+                  onChange={(e) => setRenewedDeposit(onlyDigits(e.target.value))}
+                />
+                {hasMonthlyRent && (
+                  <Input
+                    label="갱신 후 월 차임 (원)"
+                    hint="종전과 같으면 그대로 두세요"
+                    inputMode="numeric"
+                    value={comma(derivedRenewedMonthlyRent)}
+                    onChange={(e) => setRenewedMonthlyRent(onlyDigits(e.target.value))}
+                  />
+                )}
+              </div>
+
+              <LegalNotice tone="info">
+                본 서비스는 입력하신 날짜·금액을 서식에 그대로 옮겨 적을 뿐, 그 날짜가 법령이 정한
+                기간 안이었는지, 증액이 법 제7조의 범위 안인지를 판단하지 않습니다.
+              </LegalNotice>
+            </div>
+          </Card>
+        )}
+
+        {/* 6. 확인 */}
         <Card>
-          <SectionTitle no={5}>확인</SectionTitle>
+          <SectionTitle no={6}>확인</SectionTitle>
           <div className="space-y-4">
             {checks.map((c, i) => (
               <label
@@ -535,7 +719,7 @@ export function RenewalForm() {
           </div>
         </Card>
 
-        {/* ── 계산 결과 (법령정보형 출력. 결론·배지 금지) */}
+        {/* ── 계산 결과 (통지서 전용. 법령정보형 출력, 결론·배지 금지) */}
         {win && (
           <div className="rounded-2xl border border-brand-200 bg-brand-50 p-6 shadow-sm">
             {/* 근거 조문 표기 — 기간 자체는 제6조 제1항 전단이 정하고 제6조의3 제1항이 이를 인용한다.
@@ -613,10 +797,10 @@ export function RenewalForm() {
           </div>
         )}
 
-        {/* 6. 보내기 */}
+        {/* 7. 보내기 */}
         {canBuild && (
           <Card>
-            <SectionTitle no={6}>보내기</SectionTitle>
+            <SectionTitle no={7}>{isConfirm ? "내려받기 · 보내기" : "보내기"}</SectionTitle>
             <div className="space-y-5">
               <div className="flex flex-wrap gap-2">
                 <Button variant="primary" onClick={handleDownloadPdf} disabled={downloading}>
@@ -634,12 +818,20 @@ export function RenewalForm() {
                 <p className="rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">{pdfErr}</p>
               )}
 
-              <p className="rounded-xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">
-                문자·카카오톡으로 보낼 때는{" "}
-                <b className="text-slate-900">인쇄한 파일과 요약 텍스트를 함께</b> 보내는 것이
-                일반적입니다. 파일만 보내면 열어보지 않는 경우가 있습니다. 받은 답장은 보관해
-                두시면 도달 여부를 확인하는 자료가 됩니다.
-              </p>
+              {isConfirm ? (
+                <p className="rounded-xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">
+                  확인서는 <b className="text-slate-900">임대인과 임차인이 각각 서명·날인</b>하는
+                  서식입니다. 2부를 출력해 한 부씩 나누어 갖거나, 서명한 문서를 사진·스캔으로
+                  주고받아 각자 보관하는 방식이 일반적입니다.
+                </p>
+              ) : (
+                <p className="rounded-xl bg-slate-50 p-4 text-xs leading-relaxed text-slate-600">
+                  문자·카카오톡으로 보낼 때는{" "}
+                  <b className="text-slate-900">인쇄한 파일과 요약 텍스트를 함께</b> 보내는 것이
+                  일반적입니다. 파일만 보내면 열어보지 않는 경우가 있습니다. 받은 답장은 보관해
+                  두시면 도달 여부를 확인하는 자료가 됩니다.
+                </p>
+              )}
 
               <div className="border-t border-slate-200 pt-5">
                 <div className="grid gap-4 sm:grid-cols-2">
@@ -678,20 +870,22 @@ export function RenewalForm() {
                 )}
               </div>
 
-              <LegalNotice tone="warn" title="도달 증명이 필요한 경우">
-                전자우편과 문자는 <b>도달 사실을 증명하는 수단이 아닙니다.</b> 임대인이 응답하지
-                않거나, 이미 퇴거·실거주 통보를 받았거나, 마감이 임박한 경우에는 우체국{" "}
-                <b>내용증명 + 배달증명</b> 우편이 이용됩니다. 내용증명은 ‘무엇을 보냈는지’를,
-                배달증명은 ‘언제 도달했는지’를 증명합니다.{" "}
-                <a
-                  href="https://service.epost.go.kr/postal/front/econprf/pafay02b01.jsp"
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-semibold underline"
-                >
-                  인터넷우체국 내용증명 안내 →
-                </a>
-              </LegalNotice>
+              {!isConfirm && (
+                <LegalNotice tone="warn" title="도달 증명이 필요한 경우">
+                  전자우편과 문자는 <b>도달 사실을 증명하는 수단이 아닙니다.</b> 임대인이 응답하지
+                  않거나, 이미 퇴거·실거주 통보를 받았거나, 마감이 임박한 경우에는 우체국{" "}
+                  <b>내용증명 + 배달증명</b> 우편이 이용됩니다. 내용증명은 ‘무엇을 보냈는지’를,
+                  배달증명은 ‘언제 도달했는지’를 증명합니다.{" "}
+                  <a
+                    href="https://service.epost.go.kr/postal/front/econprf/pafay02b01.jsp"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="font-semibold underline"
+                  >
+                    인터넷우체국 내용증명 안내 →
+                  </a>
+                </LegalNotice>
+              )}
             </div>
           </Card>
         )}
@@ -713,13 +907,15 @@ export function RenewalForm() {
         </Card>
       </div>
 
-      {/* ── 통지서 미리보기 / 인쇄 대상 */}
+      {/* ── 서식 미리보기 / 인쇄 대상 */}
       {canBuild && (
         <div className="mt-6 print:mt-0">
-          <p className="mb-2 text-sm font-semibold text-slate-500 print:hidden">통지서 미리보기</p>
-          <pre className="whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white p-8 text-[13px] leading-[1.9] text-slate-900 shadow-sm print:rounded-none print:border-0 print:p-0 print:shadow-none">
-            {noticeText}
-          </pre>
+          <p className="mb-2 text-sm font-semibold text-slate-500 print:hidden">서식 미리보기</p>
+          <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm print:overflow-visible print:rounded-none print:border-0 print:shadow-none">
+            <div className="min-w-[560px] print:min-w-0">
+              <FormDocument doc={doc} />
+            </div>
+          </div>
         </div>
       )}
     </>

@@ -23,9 +23,9 @@ function toDotDate(ymd: string): string {
 }
 
 export const metadata: Metadata = {
-  title: "계약갱신 요구 통지서 만들기 | 내지마요",
+  title: "계약갱신 서식 만들기 | 내지마요",
   description:
-    "전세·월세 계약갱신요구권 통지서를 무료로 만들어 보세요. 계약서상 만료일만 입력하면 주택임대차보호법 제6조의3이 정한 행사 기간이 계산되고, 통지서를 인쇄·이메일·문자로 보낼 수 있습니다.",
+    "전세·월세 계약갱신요구권 통지서와 주택임대차계약 갱신 확인서를 무료로 만들어 보세요. 계약서상 만료일만 입력하면 주택임대차보호법 제6조의3이 정한 행사 기간이 계산되고, 서식을 인쇄·이메일·문자로 보낼 수 있습니다.",
 };
 
 export default async function RenewalPage() {
@@ -41,11 +41,16 @@ export default async function RenewalPage() {
             무료
           </span>
           <h1 className="mt-3 text-2xl font-bold text-slate-900 sm:text-3xl">
-            계약갱신 요구 통지서 만들기
+            계약갱신 서식 만들기
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-slate-500">
             계약서를 꺼내 놓고 시작하세요. 입력하신 내용이 정해진 서식에 그대로 들어가고,
             주택임대차보호법 제6조의3이 정한 기간이 함께 계산됩니다.
+          </p>
+          <p className="mt-2 text-sm leading-relaxed text-slate-500">
+            갱신을 요구할 때 쓰는 <b className="text-slate-700">계약갱신 요구 통지서</b>와, 갱신이
+            이루어진 뒤 그 갱신이 갱신요구권 행사에 의한 것이었음을 양 당사자가 함께 기록해 두는{" "}
+            <b className="text-slate-700">주택임대차계약 갱신 확인서</b> 두 가지를 만들 수 있습니다.
           </p>
         </div>
 
