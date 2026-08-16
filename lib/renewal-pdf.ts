@@ -71,8 +71,8 @@ const CELL_SIZE = 9.5;
 
 const BODY_SIZE = 10;
 const NOTE_SIZE = 8.5;
-const NOTE_LH = 12;
-const NOTE_PARA_GAP = 5;
+const NOTE_LH = 11;
+const NOTE_PARA_GAP = 4;
 const HEAD_SIZE = 11;
 
 /**
@@ -113,11 +113,11 @@ const ROOMY: Metrics = {
 const TIGHT: Metrics = {
   cellPadY: 5,
   cellLh: 13.5,
-  cellMinH: 26,
+  cellMinH: 24,
   bodyLh: 16,
   bodyPad: 11,
   bodyParaGap: 8,
-  headGapAbove: 15,
+  headGapAbove: 12,
   headGapBelow: 6,
   bodySlack: 0,
 };
@@ -482,13 +482,13 @@ export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array
   // ── 날짜 · 서명란 ───────────────────────────────────────────────────────
   const dateSize = 11;
   const signSize = 11;
-  const signRowH = 34;
-  ensure(24 + dateSize + 26 + signRowH * doc.signatures.length);
+  const signRowH = 30;
+  ensure(16 + dateSize + 18 + signRowH * doc.signatures.length);
 
-  y -= 24;
+  y -= 16;
   const dw = spacedWidth(font, doc.dateText, dateSize, 1.2);
   drawSpacedText(page, font, doc.dateText, (PAGE.w - dw) / 2, y - dateSize, dateSize, 1.2, C_TEXT);
-  y -= dateSize + 26;
+  y -= dateSize + 18;
 
   // 오른쪽 정렬 서명 블록 — 라벨 / 성명 / (서명 또는 날인) 을 한 줄에 두고 밑줄을 긋는다.
   // 라벨 폭은 서명란이 여러 줄일 때 세로로 맞아야 하므로 가장 긴 라벨 기준으로 통일한다.

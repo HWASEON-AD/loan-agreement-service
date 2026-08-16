@@ -43,14 +43,11 @@ import {
 import {
   buildFormDoc,
   docTitleOf,
-  renderDocAsText,
   type DocKind,
 } from "@/lib/renewal-doc";
 import {
   buildRenewalConfirmSms,
-  buildRenewalConfirmSubject,
   buildRenewalNoticeSms,
-  buildRenewalNoticeSubject,
   type RenewalNotice,
 } from "@/lib/renewal-text";
 
@@ -208,13 +205,8 @@ export function RenewalForm() {
   );
 
   const doc = useMemo(() => buildFormDoc(kind, notice), [kind, notice]);
-  const docText = useMemo(() => renderDocAsText(doc), [doc]);
   const smsText = useMemo(
     () => (isConfirm ? buildRenewalConfirmSms(notice) : buildRenewalNoticeSms(notice)),
-    [isConfirm, notice]
-  );
-  const subject = useMemo(
-    () => (isConfirm ? buildRenewalConfirmSubject(notice) : buildRenewalNoticeSubject(notice)),
     [isConfirm, notice]
   );
 
@@ -224,7 +216,13 @@ export function RenewalForm() {
   const confirmFilled = Boolean(renewalRequestDate && derivedRenewedStart && derivedRenewedEnd);
   const requiredFilled = isConfirm ? baseFilled && confirmFilled : baseFilled;
   // 주거용 확인은 '서식의 전제'이므로 게이트. (법적 판정이 아니라 제품 사양으로 둔다)
-  const canBuild = requiredFilled && ckResidential;
+  //
+  // 🚨 확인서는 '요구 사실 확인'도 게이트다.
+  //   이 서식에서 가장 하중이 실리는 문장이 "임차인은 ○월 ○일 갱신 요구의 의사를
+  //   표시하였습니다"인데, 작성자가 그 사실을 스스로 확인조차 하지 않은 채
+  //   문서에 인쇄되어 나가면 안 된다. (요구가 없었던 것을 있었던 것으로 만드는 통로가 된다)
+  //   ※ 이것도 '우리가 판정'하는 게 아니라 '이용자가 선언'하는 형식이므로 안전선 안이다.
+  const canBuild = requiredFilled && ckResidential && (!isConfirm || ckRequested);
 
   async function handleSend() {
     if (!mailTo) return;
@@ -240,10 +238,12 @@ export function RenewalForm() {
     setSending(true);
     setSendMsg(null);
     try {
+      // ★ 제목·본문 문자열을 보내지 않는다. 서버가 문서 구조에서 직접 조립한다.
+      //   (완성된 문자열을 받는 구조는 무인증 발송기가 되어 피싱에 악용될 수 있다)
       const res = await fetch("/api/renewal/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: mailTo, cc: mailCc, subject, noticeText: docText }),
+        body: JSON.stringify({ to: mailTo, cc: mailCc, kind, notice }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "발송에 실패했습니다.");
@@ -272,7 +272,7 @@ export function RenewalForm() {
       const res = await fetch("/api/renewal/pdf", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ doc, dateYmd: notice.noticeDate }),
+        body: JSON.stringify({ kind, notice, dateYmd: notice.noticeDate }),
       });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
@@ -734,6 +734,12 @@ export function RenewalForm() {
               <p className="text-xs leading-relaxed text-slate-500">
                 본 서식은 주택임대차보호법상 임대차를 전제로 작성되어 있어, 첫 번째 확인 없이는
                 다음 단계로 진행할 수 없습니다.
+              </p>
+            )}
+            {isConfirm && ckResidential && !ckRequested && (
+              <p className="text-xs leading-relaxed text-slate-500">
+                이 확인서는 <b className="text-slate-700">실제로 있었던 계약갱신 요구</b>를 기록하는
+                서식입니다. 두 번째 확인 없이는 다음 단계로 진행할 수 없습니다.
               </p>
             )}
           </div>

@@ -263,16 +263,37 @@ export function buildConfirmParagraphs(n: RenewalNotice): string[][] {
   ];
 }
 
-/** 확인서에 붙는 참고 정보 — 주어가 전부 법령·해설이어야 한다 */
+/**
+ * 확인서에 붙는 참고 정보 — 주어가 전부 법령·해설이어야 한다.
+ *
+ * 🚨🚨 이 목록에서 항목을 빼지 말 것. 특히 해지권(제4항)과 증액 상한(제3항).
+ *   이 확인서는 "이번 갱신은 제6조의3에 따른 갱신"이라고 성격을 규정하는 문서다.
+ *   그 성격이 붙는 순간 임차인에게는 **중도 해지권**이, 임대인에게는 **증액 5% 상한**이 따라온다.
+ *   존속기간 2년만 인쇄하고 해지권을 빼면, 나중에 임대인이 이 확인서를 들고
+ *   "2년이라고 서명했잖아"라며 임차인의 중도해지를 다투는 근거로 쓰인다.
+ *   → 서명하는 사람이 서명 직전에 양쪽 효과를 모두 보게 한다.
+ *
+ * ★ 개별 사안 판정이 아니라 **조문의 정적 인용**이다. 이 둘은 다르다.
+ *   "귀하의 요구일은 기간 안입니다"(판정, 금지) / "법이 정한 기간은 6~2개월 전입니다"(정보, 허용)
+ */
 export function buildConfirmNotes(): string[][] {
+  // ★ 줄바꿈을 직접 넣지 않는다. 렌더러가 지면 폭에 맞춰 흘리게 두어야
+  //   항목이 늘어도 줄 수가 최소로 유지되고 A4 한 장을 지킬 수 있다.
   return [
     [
-      "주택임대차보호법 제6조의3 제2항 : 임차인은 계약갱신요구권을 1회에 한하여 행사할 수",
-      "있으며, 갱신되는 임대차의 존속기간은 2년으로 봅니다.",
+      "주택임대차보호법 제6조의3 제2항 : 임차인은 계약갱신요구권을 1회에 한하여 행사할 수 있고, 갱신되는 임대차의 존속기간은 2년으로 봅니다.",
     ],
     [
-      "국토교통부·법무부 「개정 주택임대차보호법 해설집」은 같은 법 제6조에 따른 묵시적",
-      "갱신은 계약갱신요구권의 행사로 보지 않는다는 입장입니다.",
+      "같은 조 제1항 본문 및 제6조 제1항 전단 : 계약갱신의 요구는 임대차기간이 끝나기 6개월 전부터 2개월 전까지의 기간에 하는 것으로 정해져 있습니다.",
+    ],
+    [
+      "같은 조 제4항 : 임차인은 위 갱신요구에 따라 갱신된 임대차에 대하여도 언제든지 임대인에게 계약해지를 통지할 수 있고, 임대인이 그 통지를 받은 날부터 3개월이 지나면 해지의 효력이 발생합니다.",
+    ],
+    [
+      "같은 조 제3항 및 제7조 : 갱신되는 임대차의 차임과 보증금의 증액은 약정한 차임·보증금의 20분의 1의 금액을 초과하지 못합니다.",
+    ],
+    [
+      "국토교통부·법무부 「개정 주택임대차보호법 해설집」은 같은 법 제6조에 따른 묵시적 갱신은 계약갱신요구권의 행사로 보지 않는다는 입장입니다.",
     ],
   ];
 }
@@ -337,7 +358,14 @@ export function buildConfirmDoc(n: RenewalNotice): FormDoc {
       propertyTable(n, false),
       renewalTermsTable(n),
       { kind: "body", heading: "확인 사항", paragraphs: buildConfirmParagraphs(n) },
-      { kind: "note", heading: "참고", paragraphs: buildConfirmNotes() },
+      {
+        kind: "note",
+        // 🚨 "당사자가 합의한 내용이 아님"을 반드시 밝힌다.
+        //   이 문구가 없으면 참고란의 조문이 합의 조항으로 오해될 수 있고,
+        //   그러면 우리가 당사자 대신 계약 내용을 넣은 셈이 된다.
+        heading: "참고 — 아래는 관련 법령의 내용이며, 당사자가 합의한 내용이 아닙니다",
+        paragraphs: buildConfirmNotes(),
+      },
     ],
     dateText: formatSignatureDate(n.noticeDate),
     signatures: [
@@ -355,6 +383,152 @@ export function buildFormDoc(kind: DocKind, n: RenewalNotice): FormDoc {
 /** 다운로드·메일 제목에 쓰는 문서명 */
 export function docTitleOf(kind: DocKind): string {
   return kind === "confirm" ? "주택임대차계약 갱신 확인서" : "계약갱신 요구 통지서";
+}
+
+// ---------------------------------------------------------------------------
+// 서버측 검증
+// ---------------------------------------------------------------------------
+//
+// 🚨 왜 서버가 구조를 검증해야 하나
+//   PDF·이메일 라우트는 무인증 공개 엔드포인트다. 예전에는 클라이언트가 만든
+//   **완성된 문자열**을 그대로 받아 메일로 내보냈는데, 그러면 naejimayo.com 발신으로
+//   임의 제목·임의 본문을 아무에게나 보낼 수 있는 **발송기**가 된다(피싱 악용).
+//   → 서버는 '구조'만 받고 문장은 서버가 조립한다. 이용자 입력은 칸 안의 값으로만 들어간다.
+
+/** 한 칸에 들어갈 수 있는 최대 길이 — 서식의 칸이지 자유 게시판이 아니다 */
+const MAX_FIELD_LEN = 200;
+
+/**
+ * 서식 칸에 들어갈 수 있는 값인가.
+ *
+ * 🚨 URL 을 막는 이유: 임대차 서식의 성명·주소·연락처 칸에 링크가 들어갈 일은 없다.
+ *   반대로 링크를 허용하면 "우리 도메인에서 발송되는 메일에 임의 링크를 심는" 통로가 남는다.
+ *   제어문자도 막는다(헤더 인젝션·본문 조작 방지).
+ */
+function okField(v: unknown): boolean {
+  if (typeof v !== "string") return false;
+  if (v.length > MAX_FIELD_LEN) return false;
+  for (let i = 0; i < v.length; i++) {
+    const code = v.charCodeAt(i);
+    if (code < 32 || code === 127) return false;
+  }
+  if (/https?:\/\/|www\.|<\s*a[\s>]/i.test(v)) return false;
+  return true;
+}
+
+function okDate(v: unknown): boolean {
+  return typeof v === "string" && (v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v));
+}
+
+function okMoney(v: unknown): boolean {
+  return v === undefined || (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 1e15);
+}
+
+/**
+ * 서식 입력값 검증.
+ *
+ * 🚨🚨 서버는 **값만** 받고 문장은 서버가 만든다(`buildFormDoc`).
+ *   완성된 문서 구조(FormDoc)를 그대로 받으면, 공격자가 껍데기를 흉내내
+ *   본문 문단에 임의 문구를 넣어 우리 도메인으로 발송할 수 있다.
+ *   실제로 그 구멍을 확인하고 이 구조로 바꿨다. 되돌리지 말 것.
+ */
+export function isRenewalInput(v: unknown): v is RenewalNotice {
+  if (!v || typeof v !== "object") return false;
+  const n = v as Record<string, unknown>;
+
+  const texts = [
+    "propertyAddress", "tenantName", "tenantPhone", "tenantAddress",
+    "landlordName", "landlordAddress", "landlordPhone",
+  ];
+  for (const k of texts) {
+    if (n[k] === undefined) continue;
+    if (!okField(n[k])) return false;
+  }
+  if (!okField(n.propertyAddress) || !okField(n.tenantName) || !okField(n.landlordName)) {
+    return false;
+  }
+
+  const dates = [
+    "startDate", "endDate", "noticeDate",
+    "renewalRequestDate", "renewedStartDate", "renewedEndDate",
+  ];
+  for (const k of dates) {
+    if (n[k] === undefined) continue;
+    if (!okDate(n[k])) return false;
+  }
+  if (!okDate(n.startDate) || !okDate(n.endDate) || !okDate(n.noticeDate)) return false;
+
+  if (typeof n.hasMonthlyRent !== "boolean") return false;
+  if (typeof n.deposit !== "number" || !Number.isFinite(n.deposit) || n.deposit < 0) return false;
+  for (const k of ["monthlyRent", "renewedDeposit", "renewedMonthlyRent"]) {
+    if (!okMoney(n[k])) return false;
+  }
+  if (n.condition !== "same" && n.condition !== "negotiate") return false;
+
+  return true;
+}
+
+/** 서식 종류 검증 */
+export function isDocKind(v: unknown): v is DocKind {
+  return v === "notice" || v === "confirm";
+}
+
+function okText(v: unknown): boolean {
+  return typeof v === "string" && v.length <= 400;
+}
+
+/** 렌더러가 기대하는 모양인지 검증한다 (값 자체는 이용자 입력 그대로 둔다) */
+export function isFormDoc(v: unknown): v is FormDoc {
+  if (!v || typeof v !== "object") return false;
+  const d = v as Record<string, unknown>;
+  if (!okText(d.title) || !d.title) return false;
+  if (!okText(d.dateText)) return false;
+  if (!Array.isArray(d.blocks) || d.blocks.length === 0 || d.blocks.length > 12) return false;
+  if (!Array.isArray(d.signatures) || d.signatures.length > 4) return false;
+
+  for (const s of d.signatures as Record<string, unknown>[]) {
+    if (!s || !okText(s.label) || !okText(s.name)) return false;
+  }
+
+  for (const b of d.blocks as Record<string, unknown>[]) {
+    if (!b || typeof b !== "object" || !okText(b.heading)) return false;
+
+    if (b.kind === "table") {
+      if (!Array.isArray(b.colRatios) || !Array.isArray(b.rows)) return false;
+      if (b.rows.length > 30) return false;
+      for (const row of b.rows as unknown[]) {
+        if (!Array.isArray(row) || row.length > 6) return false;
+        for (const cell of row as Record<string, unknown>[]) {
+          if (!cell || !okText(cell.text)) return false;
+        }
+      }
+      continue;
+    }
+
+    if (b.kind === "body" || b.kind === "note") {
+      if (!Array.isArray(b.paragraphs) || b.paragraphs.length > 20) return false;
+      for (const para of b.paragraphs as unknown[]) {
+        if (!Array.isArray(para) || para.length > 20) return false;
+        for (const line of para) if (!okText(line)) return false;
+      }
+      continue;
+    }
+
+    return false;
+  }
+  return true;
+}
+
+/**
+ * 메일 제목 — 서버가 문서에서 뽑아 만든다.
+ * ★ 클라이언트가 준 제목 문자열을 그대로 쓰면 임의 제목 발송기가 된다.
+ */
+export function buildSubjectFromDoc(doc: FormDoc): string {
+  const table = doc.blocks.find(
+    (b): b is DocTableBlock => b.kind === "table" && b.heading.includes("임차주택")
+  );
+  const address = table?.rows[0]?.[1]?.text?.trim();
+  return address ? `[${doc.title}] ${address}` : `[${doc.title}]`;
 }
 
 // ---------------------------------------------------------------------------

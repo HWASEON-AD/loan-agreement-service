@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { allowRequest } from "@/lib/rate-limit";
 import { generateRenewalNoticePdf, renewalPdfFilename } from "@/lib/renewal-pdf";
-import type { FormDoc } from "@/lib/renewal-doc";
+import { buildFormDoc, isDocKind, isRenewalInput } from "@/lib/renewal-doc";
 
 // 폰트 임베드에 Node 런타임이 필요하다 (Edge 불가)
 export const runtime = "nodejs";
@@ -15,29 +15,6 @@ function getIp(req: NextRequest): string {
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd) return fwd.split(",")[0].trim();
   return req.headers.get("x-real-ip") || "unknown";
-}
-
-// 최소 구조 검증 — 렌더러가 기대하는 모양인지만 본다 (내용은 이용자 입력 그대로 둔다)
-function isFormDoc(v: unknown): v is FormDoc {
-  if (!v || typeof v !== "object") return false;
-  const d = v as Record<string, unknown>;
-  if (typeof d.title !== "string" || !d.title) return false;
-  if (typeof d.dateText !== "string") return false;
-  if (!Array.isArray(d.blocks) || d.blocks.length === 0 || d.blocks.length > 12) return false;
-  if (!Array.isArray(d.signatures) || d.signatures.length > 4) return false;
-
-  for (const b of d.blocks as Record<string, unknown>[]) {
-    if (!b || typeof b !== "object") return false;
-    if (b.kind === "table") {
-      if (!Array.isArray(b.colRatios) || !Array.isArray(b.rows)) return false;
-      if ((b.rows as unknown[]).length > 30) return false;
-    } else if (b.kind === "body" || b.kind === "note") {
-      if (!Array.isArray(b.paragraphs)) return false;
-    } else {
-      return false;
-    }
-  }
-  return true;
 }
 
 export async function POST(req: NextRequest) {
@@ -51,16 +28,16 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const doc = body?.doc;
+    const kind = body?.kind;
+    const notice = body?.notice;
     const dateYmd: string = (body?.dateYmd ?? "").trim();
 
-    if (!isFormDoc(doc)) {
+    if (!isDocKind(kind) || !isRenewalInput(notice)) {
       return NextResponse.json({ error: "서식 내용이 올바르지 않습니다." }, { status: 400 });
     }
-    // 서식 1~2장 분량을 크게 넘지 않도록 상한을 둔다
-    if (JSON.stringify(doc).length > 20000) {
-      return NextResponse.json({ error: "서식 내용이 너무 깁니다." }, { status: 400 });
-    }
+
+    // ★ 서버가 값으로부터 문서를 조립한다 (완성된 문서 구조를 그대로 받지 않는다)
+    const doc = buildFormDoc(kind, notice);
 
     const pdfBytes = await generateRenewalNoticePdf(doc);
     const filename = renewalPdfFilename(
