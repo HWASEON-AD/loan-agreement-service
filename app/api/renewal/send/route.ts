@@ -17,11 +17,13 @@ import { allowRequest } from "@/lib/rate-limit";
 import { sendRenewalNoticeEmail } from "@/lib/email";
 import {
   buildFormDoc,
+  buildLawLabel,
   buildSubjectFromDoc,
   isDocKind,
   isRenewalInput,
   renderDocAsText,
 } from "@/lib/renewal-doc";
+import { getLawStatusForDisplay } from "@/lib/law-watch";
 
 // 이메일 형식 최소 검증
 function isEmail(v: string): boolean {
@@ -69,7 +71,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ★ 문서의 문장·제목은 전부 서버가 만든다. 이용자 입력은 칸 안의 값으로만 들어간다.
-    const doc = buildFormDoc(kind, notice);
+    const law = await getLawStatusForDisplay().catch(() => null);
+    const doc = buildFormDoc(kind, notice, buildLawLabel(law?.effectiveDate, law?.lawNumber));
     const subject = buildSubjectFromDoc(doc);
     const noticeText = renderDocAsText(doc);
 

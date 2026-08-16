@@ -276,7 +276,28 @@ export function buildConfirmParagraphs(n: RenewalNotice): string[][] {
  * ★ 개별 사안 판정이 아니라 **조문의 정적 인용**이다. 이 둘은 다르다.
  *   "귀하의 요구일은 기간 안입니다"(판정, 금지) / "법이 정한 기간은 6~2개월 전입니다"(정보, 허용)
  */
-export function buildConfirmNotes(): string[][] {
+/**
+ * 참고란에 박는 법령 기준 시점 표기.
+ *
+ * 🚨 왜 시점을 박나 — 화면은 고치면 끝이지만 **인쇄된 종이는 회수할 수 없다.**
+ *   나중에 법이 개정되면, 시점이 없는 문서는 "틀린 법률정보"가 되고 그 책임 소재가 흐려진다.
+ *   시행일·법률번호를 함께 적으면 "그 시점의 법령을 옮긴 것"으로 고정되어,
+ *   개정 이후에도 문서 자체가 스스로 기준 시점을 밝힌다.
+ *   값은 매일 1회 법제처를 확인하는 크론이 갱신한다(`lib/law-watch.ts`).
+ */
+export function buildLawLabel(
+  effectiveDate?: string | null,
+  lawNumber?: string | null
+): string | undefined {
+  if (!effectiveDate) return undefined;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(effectiveDate);
+  const d = m ? `${Number(m[1])}. ${Number(m[2])}. ${Number(m[3])}.` : effectiveDate;
+  return lawNumber
+    ? `주택임대차보호법 [시행 ${d}] [법률 ${lawNumber}]`
+    : `주택임대차보호법 [시행 ${d}]`;
+}
+
+export function buildConfirmNotes(lawLabel?: string): string[][] {
   // ★ 줄바꿈을 직접 넣지 않는다. 렌더러가 지면 폭에 맞춰 흘리게 두어야
   //   항목이 늘어도 줄 수가 최소로 유지되고 A4 한 장을 지킬 수 있다.
   return [
@@ -294,6 +315,11 @@ export function buildConfirmNotes(): string[][] {
     ],
     [
       "국토교통부·법무부 「개정 주택임대차보호법 해설집」은 같은 법 제6조에 따른 묵시적 갱신은 계약갱신요구권의 행사로 보지 않는다는 입장입니다.",
+    ],
+    [
+      lawLabel
+        ? `${lawLabel} 기준으로 옮겨 적은 것입니다. 조문 전문은 국가법령정보센터(law.go.kr).`
+        : "조문을 옮겨 적은 것입니다. 조문 전문은 국가법령정보센터(law.go.kr).",
     ],
   ];
 }
@@ -336,7 +362,7 @@ function renewalTermsTable(n: RenewalNotice): DocTableBlock {
 }
 
 /** 주택임대차계약 갱신 확인서 */
-export function buildConfirmDoc(n: RenewalNotice): FormDoc {
+export function buildConfirmDoc(n: RenewalNotice, lawLabel?: string): FormDoc {
   return {
     title: "주택임대차계약 갱신 확인서",
     blocks: [
@@ -364,7 +390,7 @@ export function buildConfirmDoc(n: RenewalNotice): FormDoc {
         //   이 문구가 없으면 참고란의 조문이 합의 조항으로 오해될 수 있고,
         //   그러면 우리가 당사자 대신 계약 내용을 넣은 셈이 된다.
         heading: "참고 — 아래는 관련 법령의 내용이며, 당사자가 합의한 내용이 아닙니다",
-        paragraphs: buildConfirmNotes(),
+        paragraphs: buildConfirmNotes(lawLabel),
       },
     ],
     dateText: formatSignatureDate(n.noticeDate),
@@ -376,8 +402,8 @@ export function buildConfirmDoc(n: RenewalNotice): FormDoc {
 }
 
 /** 종류에 따라 서식을 만든다 */
-export function buildFormDoc(kind: DocKind, n: RenewalNotice): FormDoc {
-  return kind === "confirm" ? buildConfirmDoc(n) : buildNoticeDoc(n);
+export function buildFormDoc(kind: DocKind, n: RenewalNotice, lawLabel?: string): FormDoc {
+  return kind === "confirm" ? buildConfirmDoc(n, lawLabel) : buildNoticeDoc(n);
 }
 
 /** 다운로드·메일 제목에 쓰는 문서명 */
@@ -444,8 +470,11 @@ export function isRenewalInput(v: unknown): v is RenewalNotice {
     if (n[k] === undefined) continue;
     if (!okField(n[k])) return false;
   }
-  if (!okField(n.propertyAddress) || !okField(n.tenantName) || !okField(n.landlordName)) {
-    return false;
+  // 필수 칸은 비어 있으면 안 된다. 화면에서 막고 있지만 API 는 직접 호출될 수 있고,
+  // 성명이 빈 확인서가 만들어지면 그 자체로 분쟁의 소지가 된다.
+  const required = [n.propertyAddress, n.tenantName, n.landlordName];
+  for (const v of required) {
+    if (!okField(v) || (v as string).trim() === "") return false;
   }
 
   const dates = [
@@ -456,7 +485,9 @@ export function isRenewalInput(v: unknown): v is RenewalNotice {
     if (n[k] === undefined) continue;
     if (!okDate(n[k])) return false;
   }
-  if (!okDate(n.startDate) || !okDate(n.endDate) || !okDate(n.noticeDate)) return false;
+  for (const v of [n.startDate, n.endDate, n.noticeDate]) {
+    if (!okDate(v) || v === "") return false;
+  }
 
   if (typeof n.hasMonthlyRent !== "boolean") return false;
   if (typeof n.deposit !== "number" || !Number.isFinite(n.deposit) || n.deposit < 0) return false;

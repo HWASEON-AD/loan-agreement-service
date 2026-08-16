@@ -6,7 +6,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { allowRequest } from "@/lib/rate-limit";
 import { generateRenewalNoticePdf, renewalPdfFilename } from "@/lib/renewal-pdf";
-import { buildFormDoc, isDocKind, isRenewalInput } from "@/lib/renewal-doc";
+import { buildFormDoc, buildLawLabel, isDocKind, isRenewalInput } from "@/lib/renewal-doc";
+import { getLawStatusForDisplay } from "@/lib/law-watch";
 
 // 폰트 임베드에 Node 런타임이 필요하다 (Edge 불가)
 export const runtime = "nodejs";
@@ -37,7 +38,8 @@ export async function POST(req: NextRequest) {
     }
 
     // ★ 서버가 값으로부터 문서를 조립한다 (완성된 문서 구조를 그대로 받지 않는다)
-    const doc = buildFormDoc(kind, notice);
+    const law = await getLawStatusForDisplay().catch(() => null);
+    const doc = buildFormDoc(kind, notice, buildLawLabel(law?.effectiveDate, law?.lawNumber));
 
     const pdfBytes = await generateRenewalNoticePdf(doc);
     const filename = renewalPdfFilename(

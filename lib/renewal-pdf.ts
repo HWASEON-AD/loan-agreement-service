@@ -71,8 +71,8 @@ const CELL_SIZE = 9.5;
 
 const BODY_SIZE = 10;
 const NOTE_SIZE = 8.5;
-const NOTE_LH = 11;
-const NOTE_PARA_GAP = 4;
+const NOTE_LH = 10.5;
+const NOTE_PARA_GAP = 3.5;
 const HEAD_SIZE = 11;
 
 /**
