@@ -9,7 +9,20 @@ import path from "path";
 import type { Agreement, SignatureRecord } from "./types";
 import { SERVICE_NAME } from "./config";
 
-const FONT_PATH = path.join(process.cwd(), "assets", "fonts", "NotoSansKR-Regular.otf");
+// 로고 표기(SERVICE_NAME)는 앞에 "/" 가 붙어 있다. 법적 문서 본문에 그대로 넣으면
+// "/ 내지마요은 …" 처럼 나오므로, 문서에는 기호를 뗀 이름을 쓴다.
+const BRAND = SERVICE_NAME.replace(/^[\/\s]+/, "").trim();
+
+// 🚨🚨 폰트는 반드시 **TTF** 를 **subset:false** 로 임베드할 것.
+//   원래 이 파일은 assets/fonts/NotoSansKR-Regular.otf 를 subset:true 로 쓰고 있었고,
+//   그 결과 **발급된 인증서 PDF에 한글이 하나도 나오지 않았다**(제목·성명 전부 빈칸,
+//   영문·숫자만 표시). 실제로 생성해 렌더링해서 확인한 사고다.
+//   원인: pdf-lib(fontkit)이 CJK **OTF(CFF)** 를 제대로 임베드하지 못한다.
+//   NanumGothic 은 SIL OFL 이라 임베드·재배포가 자유롭다. (public/fonts 에 있는 것과 동일 파일)
+//   ⚠️ 텍스트 추출만으로 검증하지 말 것 — 추출은 되는데 화면이 백지인 경우가 있다. PNG 로 눈으로 볼 것.
+const FONT_PATH = path.join(process.cwd(), "public", "fonts", "NanumGothic-Regular.ttf");
+const FONT_URL_PATH = "/fonts/NanumGothic-Regular.ttf";
+const BASE_URL = (process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000").replace(/\/$/, "");
 let cachedFontBytes: Uint8Array | null = null;
 
 async function loadFontBytes(): Promise<Uint8Array | null> {
@@ -19,8 +32,19 @@ async function loadFontBytes(): Promise<Uint8Array | null> {
     cachedFontBytes = new Uint8Array(buf);
     return cachedFontBytes;
   } catch {
-    return null;
+    /* fs 실패 시 HTTP 폴백 — Vercel 번들에 파일이 없을 수 있다 */
   }
+  try {
+    const res = await fetch(`${BASE_URL}${FONT_URL_PATH}`);
+    if (res.ok) {
+      cachedFontBytes = new Uint8Array(await res.arrayBuffer());
+      return cachedFontBytes;
+    }
+  } catch {
+    /* ignored */
+  }
+  console.error("[audit-certificate] 한글 폰트 로드 최종 실패 — 인증서 한글이 깨집니다");
+  return null;
 }
 
 function base64ToBytes(b64: string): Uint8Array | null {
@@ -49,14 +73,23 @@ function wrapLine(font: PDFFont, text: string, fontSize: number, maxWidth: numbe
   return lines;
 }
 
+// KST 시각 표기. 로케일 출력 문자열을 치환하는 방식은 ICU 버전에 따라
+// "2026-8-16-14시 17분 21초" 같은 결과가 나오므로 각 부분을 직접 조립한다.
 function formatKstTime(isoStr: string): string {
-  try {
-    const d = new Date(isoStr);
-    return d.toLocaleString("ko-KR", { timeZone: "Asia/Seoul", hour12: false })
-      .replace(/\. /g, "-").replace(/\.$/, "") + " KST";
-  } catch {
-    return isoStr;
-  }
+  const d = new Date(isoStr);
+  if (Number.isNaN(d.getTime())) return isoStr;
+  const parts = new Intl.DateTimeFormat("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(d);
+  const g = (t: string) => parts.find((x) => x.type === t)?.value ?? "";
+  return `${g("year")}-${g("month")}-${g("day")} ${g("hour")}:${g("minute")}:${g("second")} KST`;
 }
 
 // 감사추적인증서 PDF 생성 → base64
@@ -70,7 +103,7 @@ export async function generateAuditCertificate(
   const fontBytes = await loadFontBytes();
   let font: PDFFont;
   if (fontBytes) {
-    font = await pdfDoc.embedFont(fontBytes, { subset: true });
+    font = await pdfDoc.embedFont(fontBytes, { subset: false });
   } else {
     const { StandardFonts } = await import("pdf-lib");
     font = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -164,8 +197,8 @@ export async function generateAuditCertificate(
     font,
     color: rgb(0.75, 0.82, 1),
   });
-  page.drawText(SERVICE_NAME, {
-    x: A4.width - margin - font.widthOfTextAtSize(SERVICE_NAME, 9) - 16,
+  page.drawText(BRAND, {
+    x: A4.width - margin - font.widthOfTextAtSize(BRAND, 9) - 16,
     y: cy - 38,
     size: 9,
     font,
@@ -253,9 +286,9 @@ export async function generateAuditCertificate(
   cy -= 4;
   const disclaimer = [
     "본 인증서는 전자문서 및 전자거래 기본법 제4조, 전자서명법 제3조에 따라",
-    `서명 행위를 증명하는 감사 기록이며, ${SERVICE_NAME}이 자동 발급합니다.`,
+    `서명 행위를 증명하는 감사 기록이며, ${BRAND}가 자동 발급합니다.`,
     "",
-    `${SERVICE_NAME}은 이용자가 제공한 정보를 바탕으로 서비스를 제공하였으며,`,
+    `${BRAND}는 이용자가 제공한 정보를 바탕으로 서비스를 제공하였으며,`,
     "입력 정보의 정확성에 대한 책임은 이용자에게 있습니다.",
     "(이용약관 제3조)",
     "",
@@ -269,7 +302,7 @@ export async function generateAuditCertificate(
 
   // 하단 마감선
   drawHRule(DARK, 1);
-  drawText(`발급 시각: ${issuedAt}  |  ${SERVICE_NAME}`, { size: 8, color: LIGHT });
+  drawText(`발급 시각: ${issuedAt}  |  ${BRAND}`, { size: 8, color: LIGHT });
 
   const pdfBytes = await pdfDoc.save();
   return Buffer.from(pdfBytes).toString("base64");
