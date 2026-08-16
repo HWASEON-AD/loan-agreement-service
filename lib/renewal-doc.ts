@@ -364,6 +364,67 @@ export function docTitleOf(kind: DocKind): string {
 // 이메일은 표를 그릴 수 없으므로 "라벨 : 값" 목록으로 편다.
 // ★ 표를 공백으로 흉내내지 않는다 — 수신자의 글꼴에 따라 반드시 어긋나기 때문이다.
 
+/**
+ * 라벨을 평문용으로 정리한다.
+ * 서식지의 라벨은 칸 폭을 맞추려고 자간을 벌려 둔다("임 대 인", "주   소").
+ * 표에서는 그게 맞지만 평문 목록에서는 어색하므로, 한 글자씩 떨어진 라벨만 붙여 준다.
+ * ("기존 계약" 처럼 두 글자 이상 낱말로 이루어진 것은 건드리지 않는다)
+ */
+const flat = (s: string) => {
+  const t = s.replace(/\s+/g, " ").trim();
+  const parts = t.split(" ");
+  return parts.length > 1 && parts.every((p) => [...p].length === 1) ? parts.join("") : t;
+};
+
+/**
+ * 표 한 개를 평문 줄로 편다.
+ *
+ * 🚨 단순히 "1열 : 2열" 로 펴면 안 된다. 당사자 표는 좌우 2인이 같은 라벨("주 소")을 쓰기 때문에
+ *   목록으로 펴는 순간 **어느 주소가 임대인 것인지 알 수 없게 된다.**
+ *   → 당사자 표(4열)는 사람별로 묶고, 라벨 앞에 그 사람의 역할을 붙인다.
+ *   → 머리행이 있는 대조표(3열)는 머리행을 값 앞에 괄호로 붙여 어느 쪽 값인지 남긴다.
+ */
+function tableAsTextLines(rows: DocCell[][]): string[] {
+  const out: string[] = [];
+  if (rows.length === 0) return out;
+
+  // ── 당사자 표: [라벨][값][라벨][값] — 사람별로 묶는다
+  if (rows[0].length === 4) {
+    const roleOf = (i: number) => flat(rows[0][i].text); // "발신인 (임차인)" / "임 대 인"
+    [0, 2].forEach((col, idx) => {
+      if (idx > 0) out.push("");
+      const role = roleOf(col);
+      out.push(`  - ${role} : ${rows[0][col + 1].text}`);
+      rows.slice(1).forEach((cells) => {
+        const label = flat(cells[col].text);
+        const value = cells[col + 1].text;
+        if (value) out.push(`  - ${role} ${label} : ${value}`);
+      });
+    });
+    return out;
+  }
+
+  // ── 머리행이 있는 대조표: 첫 행의 칸이 전부 라벨칸(회색)이면 머리행으로 본다
+  const hasHeader = rows[0].length >= 3 && rows[0].every((c) => c.fill);
+  if (hasHeader) {
+    const heads = rows[0].slice(1).map((c) => flat(c.text));
+    rows.slice(1).forEach((cells) => {
+      const values = cells
+        .slice(1)
+        .map((c, i) => `(${heads[i]}) ${flat(c.text)}`)
+        .join("   →   ");
+      out.push(`  - ${flat(cells[0].text)} : ${values}`);
+    });
+    return out;
+  }
+
+  // ── 그 밖: "라벨 : 값"
+  rows.forEach((cells) => {
+    out.push(`  - ${flat(cells[0].text)} : ${cells[1]?.text ?? ""}`);
+  });
+  return out;
+}
+
 /** FormDoc → 평문 (이메일 본문) */
 export function renderDocAsText(doc: FormDoc): string {
   const out: string[] = [doc.title, ""];
@@ -373,19 +434,7 @@ export function renderDocAsText(doc: FormDoc): string {
     out.push("", headings[bi], "");
 
     if (block.kind === "table") {
-      // 첫 열이 라벨인 표는 "라벨 : 값" 으로, 그 밖(머리행이 있는 표)은 열을 " | " 로 잇는다
-      block.rows.forEach((cells) => {
-        const label = cells[0].text.replace(/\n/g, " ").replace(/\s+/g, " ").trim();
-        if (cells.length === 2) {
-          out.push(`  - ${label} : ${cells[1].text}`);
-        } else if (cells.length === 4) {
-          const label2 = cells[2].text.replace(/\n/g, " ").replace(/\s+/g, " ").trim();
-          out.push(`  - ${label} : ${cells[1].text}`);
-          out.push(`  - ${label2} : ${cells[3].text}`);
-        } else {
-          out.push(`  - ${cells.map((c) => c.text.replace(/\s+/g, " ").trim()).join(" | ")}`);
-        }
-      });
+      out.push(...tableAsTextLines(block.rows));
       return;
     }
 

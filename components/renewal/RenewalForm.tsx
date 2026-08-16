@@ -35,6 +35,7 @@ import {
   calcRenewalWindow,
   calcMaxIncrease,
   calcRenewedEndDate,
+  calcRenewedTerm,
   contractMonths,
   formatKoreanDate,
   todayKst,
@@ -151,12 +152,17 @@ export function RenewalForm() {
   const [pdfErr, setPdfErr] = useState("");
 
   // 갱신 후 기간·금액의 기본값.
-  // ★ 만료일 자체는 절대 계산해 주지 않는다(계약서마다 표기가 달라 하루가 어긋난다).
-  //   여기서 채우는 건 이미 확정된 만료일에 법 제6조의3 제2항의 "2년"을 더하는 기계적 계산이며,
-  //   두 칸 모두 이용자가 계약서를 보고 고칠 수 있게 열어 둔다.
-  const derivedRenewedStart = renewedStart || endDate;
-  const derivedRenewedEnd =
-    renewedEnd || (derivedRenewedStart ? calcRenewedEndDate(derivedRenewedStart) : "");
+  // ★ 종전 만료일 자체는 절대 계산해 주지 않는다(계약서마다 표기가 달라 하루가 어긋난다).
+  //   여기서 채우는 건 이미 확정된 종전 기간으로부터 법 제6조의3 제2항의 "2년"을 적용하는
+  //   기계적 계산이며, 두 칸 모두 이용자가 계약서를 보고 고칠 수 있게 열어 둔다.
+  //   🚨 시작일을 무조건 '만료일 당일'로 두면 익일형 계약(2024.8.25~2026.8.24)에서
+  //      하루가 겹치고 갱신기간이 2년 1일이 된다 → calcRenewedTerm 이 표기 방식을 판별한다.
+  const renewedTerm = useMemo(
+    () => (endDate ? calcRenewedTerm(startDate, endDate) : null),
+    [startDate, endDate]
+  );
+  const derivedRenewedStart = renewedStart || renewedTerm?.start || "";
+  const derivedRenewedEnd = renewedEnd || renewedTerm?.end || "";
   const derivedRenewedDeposit = renewedDeposit || deposit;
   const derivedRenewedMonthlyRent = renewedMonthlyRent || monthlyRent;
 
@@ -644,19 +650,33 @@ export function RenewalForm() {
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
                   label="갱신 후 임대차기간 시작일"
-                  hint="계약서 표기 방식에 따라 종전 만료일 당일 또는 그 다음 날로 적습니다. 확인 후 고쳐주세요."
+                  hint={
+                    renewedTerm?.convention === "same-day"
+                      ? "종전 계약이 시작일과 같은 날짜로 만료되는 표기라, 만료일 당일을 기본값으로 넣었습니다."
+                      : renewedTerm?.convention === "day-after"
+                        ? "종전 계약이 시작일 하루 전으로 만료되는 표기라, 만료일 다음 날을 기본값으로 넣었습니다."
+                        : "계약서에 적힌 대로 확인 후 고쳐주세요."
+                  }
                   type="date"
                   value={derivedRenewedStart}
                   onChange={(e) => setRenewedStart(e.target.value)}
                 />
                 <Input
                   label="갱신 후 임대차기간 만료일"
-                  hint="법 제6조의3 제2항의 존속기간 2년을 시작일에 더한 날짜가 기본값입니다."
+                  hint="법 제6조의3 제2항의 존속기간 2년을 종전 만료일에 더한 날짜가 기본값입니다."
                   type="date"
                   value={derivedRenewedEnd}
                   onChange={(e) => setRenewedEnd(e.target.value)}
                 />
               </div>
+
+              {renewedTerm?.convention === "unknown" && (
+                <LegalNotice tone="warn">
+                  입력하신 <b>시작일과 만료일의 날짜가 통상적인 기간 표기와 맞지 않아</b>, 갱신
+                  기간의 시작일을 기본값으로 채우지 못했습니다. 종전 계약서의 임대차기간 칸을 다시
+                  확인하시고, 위 두 날짜를 계약서에 맞게 직접 입력해 주세요.
+                </LegalNotice>
+              )}
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <Input
@@ -886,6 +906,50 @@ export function RenewalForm() {
                   </a>
                 </LegalNotice>
               )}
+            </div>
+          </Card>
+        )}
+
+        {/* 확인서 — 서명을 받기 어려울 때 실무에서 함께 쓰이는 방법 (정적 안내)
+            ★ 반드시 무조건·병렬로 나열할 것. 입력값을 보고 하나를 골라 주면(개인화) 개별 조언이 된다.
+            ★ 효력을 단정하는 표현 금지. "증거로 제출되는 경우가 있습니다" 수준까지만 쓴다.
+            ★ (JSX 주석도 문구 린트 대상이다 — 금지어를 설명하려고 그대로 적으면 검사에 걸린다) */}
+        {isConfirm && canBuild && (
+          <Card>
+            <h2 className="text-sm font-bold text-slate-900">
+              서명을 함께 받기 어려운 경우, 실무에서 같이 쓰이는 방법
+            </h2>
+            <p className="mt-2 text-xs leading-relaxed text-slate-500">
+              아래는 일반적으로 알려진 방식을 그대로 나열한 것입니다. 본 서비스는 어느 방식이
+              이용자의 사안에 맞는지 판단하지 않으며, 각 방식의 효력을 보장하지 않습니다.
+            </p>
+
+            <div className="mt-4 space-y-4">
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-800">
+                  갱신계약서를 새로 쓰는 경우 — 계약서에 갱신의 유형을 적어 두는 방식
+                </p>
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+                  갱신계약서를 새로 작성한다면, 그 계약서 자체에 이번 갱신이 어떤 갱신인지 적어 두는
+                  예가 있습니다. 계약서는 양 당사자가 어차피 서명하는 문서이므로, 별도의 확인서를
+                  따로 받지 않아도 같은 내용이 남습니다.
+                </p>
+                <p className="mt-2 rounded-lg bg-white px-3 py-2 text-xs leading-relaxed text-slate-800">
+                  특약 예시 — “본 계약은 임차인의 주택임대차보호법 제6조의3에 따른 계약갱신요구권
+                  행사에 의한 갱신계약이다.”
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-800">
+                  문자·카카오톡으로 같은 내용을 보내고 답장을 보관하는 방식
+                </p>
+                <p className="mt-1.5 text-xs leading-relaxed text-slate-600">
+                  위 <b className="text-slate-800">‘문자·카톡용 텍스트 복사’</b>로 요지를 보내고 상대방의
+                  답장을 지우지 않고 보관해 두는 방식이 쓰입니다. 임대차 관련 분쟁에서 문자·메신저
+                  기록이 증거로 제출되는 경우가 있습니다. 다만 이는 서명한 문서와 같은 것은 아닙니다.
+                </p>
+              </div>
             </div>
           </Card>
         )}

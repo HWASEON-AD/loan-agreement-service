@@ -66,26 +66,61 @@ const TABLE_INDENT = 14; // 섹션 제목보다 표를 조금 들여쓴다 (원 
 const TABLE_X = MARGIN + TABLE_INDENT;
 const TABLE_W = CONTENT_W - TABLE_INDENT;
 
-// ★ 치수를 키울 때는 반드시 확인서(표 3개 + 본문 + 참고 + 서명 2줄)를 다시 렌더해 볼 것.
-//   확인서가 제일 빡빡한 서식이고, A4 한 장을 넘기면 둘째 장에 서명란만 남아 서식이 깨져 보인다.
 const CELL_PAD_X = 7;
-const CELL_PAD_Y = 5;
 const CELL_SIZE = 9.5;
-const CELL_LH = 13.5;
-const CELL_MIN_H = 26;
 
 const BODY_SIZE = 10;
-const BODY_LH = 16;
-const BODY_PAD = 11;
-const BODY_PARA_GAP = 8;
-
 const NOTE_SIZE = 8.5;
 const NOTE_LH = 12;
 const NOTE_PARA_GAP = 5;
-
 const HEAD_SIZE = 11;
-const HEAD_GAP_ABOVE = 15;
-const HEAD_GAP_BELOW = 6;
+
+/**
+ * 서식 밀도.
+ *
+ * 🚨 통지서(블록 3개)와 확인서(블록 5개)를 같은 치수로 그리면 둘 중 하나가 망가진다.
+ *   - 확인서 기준으로 조이면 → 통지서는 A4에 여백이 크게 남아 원 서식보다 옹색해진다
+ *   - 통지서 기준으로 벌리면 → 확인서가 A4 한 장을 넘겨 **둘째 장에 서명란만** 남는다
+ *   → 블록 수로 밀도를 나눈다. 둘 다 한 장에 들어가면서 통지서는 원 서식의 여유를 유지한다.
+ *
+ * ★ 치수를 손대면 **반드시 확인서를 다시 렌더해 1페이지인지 확인할 것.**
+ */
+type Metrics = {
+  cellPadY: number;
+  cellLh: number;
+  cellMinH: number;
+  bodyLh: number;
+  bodyPad: number;
+  bodyParaGap: number;
+  headGapAbove: number;
+  headGapBelow: number;
+  /** 본문 상자 아래 여유 (원 서식의 넉넉한 통지 상자를 재현) */
+  bodySlack: number;
+};
+
+const ROOMY: Metrics = {
+  cellPadY: 6,
+  cellLh: 14,
+  cellMinH: 30,
+  bodyLh: 17,
+  bodyPad: 13,
+  bodyParaGap: 9,
+  headGapAbove: 19,
+  headGapBelow: 8,
+  bodySlack: 18,
+};
+
+const TIGHT: Metrics = {
+  cellPadY: 5,
+  cellLh: 13.5,
+  cellMinH: 26,
+  bodyLh: 16,
+  bodyPad: 11,
+  bodyParaGap: 8,
+  headGapAbove: 15,
+  headGapBelow: 6,
+  bodySlack: 0,
+};
 
 // 색 (화면 미리보기와 같은 슬레이트 계열)
 const C_TEXT = rgb(0.12, 0.16, 0.22);
@@ -210,7 +245,12 @@ function drawSpacedText(
 // ---------------------------------------------------------------------------
 type MeasuredRow = { cells: DocCell[]; lines: string[][]; height: number };
 
-function measureTable(font: PDFFont, colWidths: number[], rows: DocCell[][]): MeasuredRow[] {
+function measureTable(
+  font: PDFFont,
+  colWidths: number[],
+  rows: DocCell[][],
+  M: Metrics
+): MeasuredRow[] {
   return rows.map((cells) => {
     const lines = cells.map((cell, i) =>
       wrapMultiline(font, cell.text, CELL_SIZE, colWidths[i] - CELL_PAD_X * 2)
@@ -219,7 +259,7 @@ function measureTable(font: PDFFont, colWidths: number[], rows: DocCell[][]): Me
     return {
       cells,
       lines,
-      height: Math.max(CELL_MIN_H, maxLines * CELL_LH + CELL_PAD_Y * 2),
+      height: Math.max(M.cellMinH, maxLines * M.cellLh + M.cellPadY * 2),
     };
   });
 }
@@ -231,7 +271,8 @@ function drawTable(
   x: number,
   yTop: number,
   colWidths: number[],
-  measured: MeasuredRow[]
+  measured: MeasuredRow[],
+  M: Metrics
 ): number {
   let y = yTop;
   for (const { cells, lines, height } of measured) {
@@ -249,10 +290,10 @@ function drawTable(
       });
 
       const ls = lines[i];
-      const padTop = (height - ls.length * CELL_LH) / 2;
+      const padTop = (height - ls.length * M.cellLh) / 2;
       ls.forEach((ln, li) => {
-        const lineTop = y - padTop - li * CELL_LH;
-        const baseline = lineTop - CELL_LH / 2 - CELL_SIZE * 0.36;
+        const lineTop = y - padTop - li * M.cellLh;
+        const baseline = lineTop - M.cellLh / 2 - CELL_SIZE * 0.36;
         const tw = font.widthOfTextAtSize(ln, CELL_SIZE);
         const tx = cell.align === "center" ? cx + (w - tw) / 2 : cx + CELL_PAD_X;
         drawText(page, font, ln, tx, baseline, CELL_SIZE, C_TEXT, cell.bold);
@@ -282,6 +323,9 @@ export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array
     const { StandardFonts } = await import("pdf-lib");
     font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   }
+
+  // 블록이 많은 서식(확인서)은 조여 그려야 A4 한 장에 들어간다.
+  const M: Metrics = doc.blocks.length <= 3 ? ROOMY : TIGHT;
 
   let page = pdfDoc.addPage([PAGE.w, PAGE.h]);
   let y = PAGE.h - MARGIN;
@@ -322,8 +366,8 @@ export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array
   const headings = numberedHeadings(doc.blocks);
 
   const drawHeading = (text: string, muted = false) => {
-    ensure(HEAD_GAP_ABOVE + HEAD_SIZE + HEAD_GAP_BELOW + 20);
-    y -= HEAD_GAP_ABOVE;
+    ensure(M.headGapAbove + HEAD_SIZE + M.headGapBelow + 20);
+    y -= M.headGapAbove;
     drawText(
       page,
       font,
@@ -334,17 +378,17 @@ export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array
       muted ? C_MUTED : C_TITLE,
       true
     );
-    y -= (muted ? HEAD_SIZE - 1.5 : HEAD_SIZE) + HEAD_GAP_BELOW;
+    y -= (muted ? HEAD_SIZE - 1.5 : HEAD_SIZE) + M.headGapBelow;
   };
 
   doc.blocks.forEach((block, bi) => {
     if (block.kind === "table") {
       const colWidths = block.colRatios.map((r) => TABLE_W * r);
-      const measured = measureTable(font, colWidths, block.rows);
+      const measured = measureTable(font, colWidths, block.rows, M);
       const h = measured.reduce((s, r) => s + r.height, 0);
       drawHeading(headings[bi]);
       ensure(h);
-      y = drawTable(page, font, TABLE_X, y, colWidths, measured);
+      y = drawTable(page, font, TABLE_X, y, colWidths, measured, M);
       return;
     }
 
@@ -352,23 +396,23 @@ export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array
       drawHeading(headings[bi]);
 
       // 문단 → 그릴 줄 목록 (빈 문자열은 문단 사이 간격을 뜻한다)
-      const maxW = TABLE_W - BODY_PAD * 2;
+      const maxW = TABLE_W - M.bodyPad * 2;
       const lines: string[] = [];
       block.paragraphs.forEach((para, pi) => {
         if (pi > 0) lines.push("");
         para.forEach((line) => wrapText(font, line, BODY_SIZE, maxW).forEach((l) => lines.push(l)));
       });
 
-      const advance = (ln: string) => (ln === "" ? BODY_PARA_GAP : BODY_LH);
+      const advance = (ln: string) => (ln === "" ? M.bodyParaGap : M.bodyLh);
       const totalH = lines.reduce((s, ln) => s + advance(ln), 0);
 
       // 상자가 페이지에 안 들어가면 조각내어 이어 그린다 (조각마다 테두리를 닫는다)
       let idx = 0;
       let first = true;
       while (idx < lines.length) {
-        if (y - (BODY_PAD * 2 + BODY_LH) < bottom) newPage();
+        if (y - (M.bodyPad * 2 + M.bodyLh) < bottom) newPage();
 
-        const avail = y - bottom - BODY_PAD * 2;
+        const avail = y - bottom - M.bodyPad * 2;
         let used = 0;
         const chunk: string[] = [];
         while (idx < lines.length && used + advance(lines[idx]) <= avail) {
@@ -383,11 +427,9 @@ export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array
           idx++;
         }
 
-        // 한 장에 다 들어간 경우엔 원 서식처럼 상자 아래에 약간의 여유를 준다.
-        // 블록이 많은 서식(확인서)은 그 여유 때문에 한 장을 넘길 수 있으므로 주지 않는다.
-        const roomy = doc.blocks.length <= 3;
-        const slack = roomy && first && idx >= lines.length && totalH < 420 ? 18 : 0;
-        const boxH = used + BODY_PAD * 2 + slack;
+        // 한 장에 다 들어간 경우엔 원 서식처럼 상자 아래에 여유를 준다 (여유값은 밀도가 정한다)
+        const slack = first && idx >= lines.length && totalH < 420 ? M.bodySlack : 0;
+        const boxH = used + M.bodyPad * 2 + slack;
         page.drawRectangle({
           x: TABLE_X,
           y: y - boxH,
@@ -397,14 +439,14 @@ export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array
           borderWidth: 0.8,
         });
 
-        let ly = y - BODY_PAD;
+        let ly = y - M.bodyPad;
         for (const ln of chunk) {
           if (ln === "") {
-            ly -= BODY_PARA_GAP;
+            ly -= M.bodyParaGap;
             continue;
           }
-          drawText(page, font, ln, TABLE_X + BODY_PAD, ly - BODY_SIZE, BODY_SIZE, C_TEXT);
-          ly -= BODY_LH;
+          drawText(page, font, ln, TABLE_X + M.bodyPad, ly - BODY_SIZE, BODY_SIZE, C_TEXT);
+          ly -= M.bodyLh;
         }
         y -= boxH;
         first = false;

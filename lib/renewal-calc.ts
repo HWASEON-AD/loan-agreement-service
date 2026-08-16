@@ -88,6 +88,14 @@ export function prevDay(dateStr: string): string {
   return toYmd(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
 }
 
+// 다음 날 날짜 — 갱신 기간 시작일 산정에 사용
+export function nextDay(dateStr: string): string {
+  const p = parseYmd(dateStr);
+  if (!p) return dateStr;
+  const t = new Date(Date.UTC(p.y, p.m - 1, p.d) + 86400000);
+  return toYmd(t.getUTCFullYear(), t.getUTCMonth() + 1, t.getUTCDate());
+}
+
 // 두 날짜 사이의 일수 차 (to - from). UTC 기준으로 계산해 DST/TZ 영향을 배제한다.
 export function diffDays(from: string, to: string): number {
   const a = parseYmd(from);
@@ -168,11 +176,70 @@ export function calcRenewalWindow(
 }
 
 // 갱신 후 만료일 — 존속기간 2년 (제6조의3 제2항)
+//
+// ★ 만료일은 계약서 표기 방식과 무관하게 "종전 만료일 + 2년"으로 같다.
+//   - 당일형 : 2024.11.14 ~ 2026.11.14  →  2026.11.14 ~ 2028.11.14   (= 만료일 + 2년)
+//   - 익일형 : 2024. 8.25 ~ 2026. 8.24  →  2026. 8.25 ~ 2028. 8.24   (= 만료일 + 2년)
+//   달라지는 건 **시작일**뿐이다. 그건 calcRenewedTerm 이 판별한다.
 export function calcRenewedEndDate(endDate: string): string {
   const p = parseYmd(endDate);
   if (!p) return endDate;
   const day = Math.min(p.d, lastDayOfMonth(p.y + 2, p.m));
   return toYmd(p.y + 2, p.m, day);
+}
+
+/**
+ * 갱신 후 임대차기간(시작일·만료일)의 기본값.
+ *
+ * 🚨 왜 필요한가 — 계약서의 기간 표기 방식이 두 가지로 갈리고, 그에 따라 갱신 시작일이 하루 달라진다.
+ *
+ *   | 계약서 표기                    | 판별              | 갱신 시작일       |
+ *   |--------------------------------|-------------------|-------------------|
+ *   | 2024. 11. 14. ~ 2026. 11. 14.  | 만료일 == 응당일  | 2026. 11. 14. (당일) |
+ *   | 2024.  8. 25. ~ 2026.  8. 24.  | 만료일+1 == 응당일| 2026.  8. 25. (다음 날) |
+ *
+ *   시작일을 무조건 "만료일 당일"로 두면 두 번째 계약에서 **하루가 겹치고 기간이 2년 1일**이 된다.
+ *   반대로 무조건 "다음 날"로 두면 첫 번째 계약에서 하루가 비고 만료일이 어긋난다.
+ *   → 시작일의 '일(日)'과 맞춰 보면 어느 방식인지 기계적으로 판별된다. 해석이 아니라 산술이다.
+ *
+ * ★ 그래도 이 값은 **기본값일 뿐**이며, 화면에서 이용자가 계약서를 보고 고칠 수 있게 열어 둔다.
+ *   판별이 안 되는 표기(convention === "unknown")면 화면에서 확인을 요청한다.
+ */
+export type RenewedTerm = {
+  start: string;
+  end: string;
+  /** same-day: 만료일 당일 시작 / day-after: 만료일 다음 날 시작 / unknown: 판별 불가 */
+  convention: "same-day" | "day-after" | "unknown";
+};
+
+export function calcRenewedTerm(startDate: string, endDate: string): RenewedTerm | null {
+  if (!isValidDate(endDate)) return null;
+
+  const end = calcRenewedEndDate(endDate);
+  const s = parseYmd(startDate);
+  const e = parseYmd(endDate);
+
+  // 시작일이 없거나 이상하면 판별하지 않는다 — 임의로 고르지 말고 이용자에게 확인을 받는다.
+  if (!s || !e || !isValidDate(startDate)) {
+    return { start: nextDay(endDate), end, convention: "unknown" };
+  }
+
+  // ① 만료일의 '일'이 시작일과 같다 → 당일형
+  if (e.d === s.d) return { start: endDate, end, convention: "same-day" };
+
+  // ①-b 양쪽이 모두 그 달의 말일이면 당일형으로 본다.
+  //     예) 2024. 2. 29. ~ 2026. 2. 28.  — 2월에 29일이 없어 28일로 적힌 것이지 익일형이 아니다.
+  //     (익일형이면 만료일 다음 날이 응당일이라 ② 에서 잡히므로 여기에 오지 않는다)
+  if (s.d === lastDayOfMonth(s.y, s.m) && e.d === lastDayOfMonth(e.y, e.m)) {
+    return { start: endDate, end, convention: "same-day" };
+  }
+
+  // ② 만료일 다음 날의 '일'이 시작일과 같다 → 익일형
+  const nd = parseYmd(nextDay(endDate));
+  if (nd && nd.d === s.d) return { start: nextDay(endDate), end, convention: "day-after" };
+
+  // ③ 어느 쪽도 아니면 판별 불가. 기간이므로 '다음 날'을 잠정값으로 두되 화면에서 확인을 요청한다.
+  return { start: nextDay(endDate), end, convention: "unknown" };
 }
 
 // 증액 상한액 계산 (제7조, 5%) — "올려야 하는 금액"이 아니라 "올릴 수 있는 최대치"

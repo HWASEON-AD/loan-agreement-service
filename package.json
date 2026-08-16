@@ -4,9 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run lint:renewal && next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "lint:renewal": "node scripts/check-renewal-wording.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.99.0",
