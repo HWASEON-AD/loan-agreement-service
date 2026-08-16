@@ -80,8 +80,10 @@ export function FormDocument({ doc }: { doc: FormDoc }) {
             </div>
           )}
 
+          {/* 참고 블록의 들여쓰기는 본문 상자 '안쪽 글자'(px-4)와 같은 열에 맞춘다.
+              테두리가 없다고 0으로 두면 참고 문단만 왼쪽으로 튀어나와 보인다. */}
           {block.kind === "note" && (
-            <div className="mt-1.5">
+            <div className="mt-1.5 px-4">
               {block.paragraphs.map((para, pi) => (
                 <p
                   key={pi}

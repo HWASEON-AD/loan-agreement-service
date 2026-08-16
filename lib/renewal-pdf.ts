@@ -455,7 +455,11 @@ export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array
     }
 
     // note — 테두리 없이 작은 글씨. 주어가 법령·해설인 문장만 들어온다.
-    const maxW = TABLE_W - 12;
+    //
+    // ★ 들여쓰기는 본문 상자 '안쪽 글자'와 같은 열(TABLE_X + bodyPad)에 맞춘다.
+    //   상자가 없다고 테두리 위치(TABLE_X)에 맞추면 참고 문단만 왼쪽으로 튀어나와 보인다.
+    const noteX = TABLE_X + M.bodyPad;
+    const maxW = TABLE_W - M.bodyPad * 2;
     const noteLines: string[] = [];
     block.paragraphs.forEach((para, pi) => {
       if (pi > 0) noteLines.push("");
@@ -470,7 +474,7 @@ export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array
         continue;
       }
       if (y - NOTE_LH < bottom) newPage();
-      drawText(page, font, ln, TABLE_X, y - NOTE_SIZE, NOTE_SIZE, C_MUTED);
+      drawText(page, font, ln, noteX, y - NOTE_SIZE, NOTE_SIZE, C_MUTED);
       y -= NOTE_LH;
     }
   });
