@@ -13,22 +13,58 @@
 //
 // 실행: npm run lint:renewal
 
-import { readFileSync } from "fs";
-import { join } from "path";
+import { readFileSync, readdirSync, statSync } from "fs";
+import { join, relative, sep } from "path";
 
 const ROOT = process.cwd();
 
-const TARGETS = [
-  "lib/renewal-calc.ts",
-  "lib/renewal-doc.ts",
-  "lib/renewal-text.ts",
-  "lib/renewal-pdf.ts",
-  "components/renewal/RenewalForm.tsx",
-  "components/renewal/FormDocument.tsx",
-  "app/renewal/page.tsx",
-  "app/api/renewal/pdf/route.ts",
-  "app/api/renewal/send/route.ts",
-];
+// 🚨 파일 목록을 하드코딩하지 말 것.
+//   이 린트가 막으려는 시나리오("6개월 뒤 누군가 좋은 뜻으로 '행사 가능' 배지를 단다")는
+//   거의 확실히 **새 파일**로 온다. 열거 방식은 자기 위협모델을 못 막는다.
+//   → 계약갱신 기능이 사는 디렉터리·파일명 규칙을 통째로 훑는다.
+const SCAN_DIRS = ["app/renewal", "components/renewal", "app/api/renewal"];
+const SCAN_LIB_PREFIX = "renewal-";
+const EXTS = [".ts", ".tsx", ".mjs"];
+
+function walk(dir) {
+  const out = [];
+  let entries;
+  try {
+    entries = readdirSync(join(ROOT, dir));
+  } catch {
+    return out;
+  }
+  for (const name of entries) {
+    const rel = `${dir}/${name}`;
+    const st = statSync(join(ROOT, rel));
+    if (st.isDirectory()) out.push(...walk(rel));
+    else if (EXTS.some((e) => name.endsWith(e))) out.push(rel);
+  }
+  return out;
+}
+
+function collectTargets() {
+  const files = [];
+  for (const d of SCAN_DIRS) files.push(...walk(d));
+  // lib/renewal-*.ts
+  try {
+    for (const name of readdirSync(join(ROOT, "lib"))) {
+      if (name.startsWith(SCAN_LIB_PREFIX) && EXTS.some((e) => name.endsWith(e))) {
+        files.push(`lib/${name}`);
+      }
+    }
+  } catch {
+    /* ignored */
+  }
+  return files.map((f) => f.split(sep).join("/")).sort();
+}
+
+const TARGETS = collectTargets();
+
+if (TARGETS.length === 0) {
+  console.error("[wording-lint] 검사 대상 파일을 하나도 찾지 못했습니다. 경로 규칙을 확인하세요.");
+  process.exit(1);
+}
 
 // ① 결론형 출력 — 서비스가 이용자의 사안에 대해 답을 내려 버리는 표현
 const CONCLUSION = [

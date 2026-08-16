@@ -70,9 +70,6 @@ const CELL_PAD_X = 7;
 const CELL_SIZE = 9.5;
 
 const BODY_SIZE = 10;
-const NOTE_SIZE = 8.5;
-const NOTE_LH = 10.5;
-const NOTE_PARA_GAP = 3.5;
 const HEAD_SIZE = 11;
 
 /**
@@ -96,6 +93,9 @@ type Metrics = {
   headGapBelow: number;
   /** 본문 상자 아래 여유 (원 서식의 넉넉한 통지 상자를 재현) */
   bodySlack: number;
+  noteSize: number;
+  noteLh: number;
+  noteParaGap: number;
 };
 
 const ROOMY: Metrics = {
@@ -108,6 +108,9 @@ const ROOMY: Metrics = {
   headGapAbove: 19,
   headGapBelow: 8,
   bodySlack: 18,
+  noteSize: 8.5,
+  noteLh: 11,
+  noteParaGap: 4,
 };
 
 const TIGHT: Metrics = {
@@ -120,6 +123,30 @@ const TIGHT: Metrics = {
   headGapAbove: 12,
   headGapBelow: 6,
   bodySlack: 0,
+  noteSize: 8.5,
+  noteLh: 10.5,
+  noteParaGap: 3.5,
+};
+
+/**
+ * 최후 밀도.
+ * 🚨 A4 한 장 제약을 '치수 상수를 조심히 다루자'는 규율로만 두면 반드시 깨진다.
+ *   참고란에 조문을 정확히 채우거나 이용자가 긴 주소를 넣으면 실제로 2페이지가 됐다(실측).
+ *   → 1차 렌더가 넘치면 이 밀도로 자동 재시도한다. 사람이 상수를 맞추지 않아도 된다.
+ */
+const ULTRA: Metrics = {
+  cellPadY: 4,
+  cellLh: 12.5,
+  cellMinH: 21,
+  bodyLh: 14.5,
+  bodyPad: 9,
+  bodyParaGap: 6,
+  headGapAbove: 9,
+  headGapBelow: 4,
+  bodySlack: 0,
+  noteSize: 8,
+  noteLh: 9.5,
+  noteParaGap: 3,
 };
 
 // 색 (화면 미리보기와 같은 슬레이트 계열)
@@ -310,7 +337,10 @@ function drawTable(
 // ---------------------------------------------------------------------------
 
 /** FormDoc → PDF 바이트 */
-export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array> {
+export async function generateRenewalNoticePdf(
+  doc: FormDoc,
+  forcedMetrics?: Metrics
+): Promise<{ bytes: Uint8Array; pageCount: number }> {
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
 
@@ -325,7 +355,7 @@ export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array
   }
 
   // 블록이 많은 서식(확인서)은 조여 그려야 A4 한 장에 들어간다.
-  const M: Metrics = doc.blocks.length <= 3 ? ROOMY : TIGHT;
+  const M: Metrics = forcedMetrics ?? (doc.blocks.length <= 3 ? ROOMY : TIGHT);
 
   let page = pdfDoc.addPage([PAGE.w, PAGE.h]);
   let y = PAGE.h - MARGIN;
@@ -463,19 +493,19 @@ export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array
     const noteLines: string[] = [];
     block.paragraphs.forEach((para, pi) => {
       if (pi > 0) noteLines.push("");
-      para.forEach((line) => wrapText(font, line, NOTE_SIZE, maxW).forEach((l) => noteLines.push(l)));
+      para.forEach((line) => wrapText(font, line, M.noteSize, maxW).forEach((l) => noteLines.push(l)));
     });
-    const noteH = noteLines.reduce((s, ln) => s + (ln === "" ? NOTE_PARA_GAP : NOTE_LH), 0);
+    const noteH = noteLines.reduce((s, ln) => s + (ln === "" ? M.noteParaGap : M.noteLh), 0);
     drawHeading(headings[bi], true);
     ensure(noteH);
     for (const ln of noteLines) {
       if (ln === "") {
-        y -= NOTE_PARA_GAP;
+        y -= M.noteParaGap;
         continue;
       }
-      if (y - NOTE_LH < bottom) newPage();
-      drawText(page, font, ln, noteX, y - NOTE_SIZE, NOTE_SIZE, C_MUTED);
-      y -= NOTE_LH;
+      if (y - M.noteLh < bottom) newPage();
+      drawText(page, font, ln, noteX, y - M.noteSize, M.noteSize, C_MUTED);
+      y -= M.noteLh;
     }
   });
 
@@ -527,7 +557,17 @@ export async function generateRenewalNoticePdf(doc: FormDoc): Promise<Uint8Array
     y -= signRowH;
   }
 
-  return await pdfDoc.save();
+  // 🚨 1페이지 제약을 '치수 상수를 조심히 다루자'는 규율로만 두면 6개월 뒤에 죽는다.
+  //   확인서가 둘째 장에 서명란만 남기고 쪼개지는 사고를 기계가 막는다.
+  //   (호출부가 이 정보를 보고 판단할 수 있도록 페이지 수를 함께 돌려준다)
+  const pageCount = pdfDoc.getPageCount();
+  // 넘쳤으면 더 조인 밀도로 한 번 더 그려 본다 (사람이 상수를 맞추지 않아도 되게)
+  if (pageCount > 1 && !forcedMetrics) {
+    const retry = await generateRenewalNoticePdf(doc, ULTRA);
+    if (retry.pageCount <= pageCount) return retry;
+  }
+  const bytes = await pdfDoc.save();
+  return { bytes, pageCount };
 }
 
 /** 다운로드 파일명 — {문서명}_YYYYMMDD.pdf */

@@ -8,6 +8,7 @@ import { readFile } from "fs/promises";
 import path from "path";
 import type { Agreement, SignatureRecord } from "./types";
 import { SERVICE_NAME } from "./config";
+import { maskIp } from "./request-info";
 
 // 로고 표기(SERVICE_NAME)는 앞에 "/" 가 붙어 있다. 법적 문서 본문에 그대로 넣으면
 // "/ 내지마요은 …" 처럼 나오므로, 문서에는 기호를 뗀 이름을 쓴다.
@@ -183,14 +184,14 @@ export async function generateAuditCertificate(
     height: 62,
     color: DARK,
   });
-  page.drawText("전자서명 감사추적 인증서", {
+  page.drawText("전자서명 감사 기록", {
     x: margin + 16,
     y: cy - 20,
     size: 16,
     font,
     color: rgb(1, 1, 1),
   });
-  page.drawText("Electronic Signature Audit Certificate", {
+  page.drawText("Electronic Signature Audit Trail", {
     x: margin + 16,
     y: cy - 38,
     size: 9,
@@ -208,7 +209,7 @@ export async function generateAuditCertificate(
 
   // 발급 정보
   const issuedAt = formatKstTime(new Date().toISOString());
-  drawRow("인증서 발급", issuedAt, MID);
+  drawRow("기록 발급", issuedAt, MID);
   drawRow("약정서 ID", agreement.id, MID);
   cy -= 4;
   drawHRule();
@@ -220,8 +221,6 @@ export async function generateAuditCertificate(
   drawRow("차 입 인(을)", agreement.borrower.name);
   drawRow("대여 금액", `${agreement.amount.toLocaleString("ko-KR")}원`);
   drawRow("대여 기간", `${agreement.startDate} ~ ${agreement.endDate}`);
-  const docHash = signatures[0]?.documentHash ?? agreement.documentHash ?? "-";
-  drawRow("문서 해시(SHA-256)", docHash, LIGHT);
   cy -= 4;
   drawHRule();
 
@@ -248,13 +247,15 @@ export async function generateAuditCertificate(
       ? partyInfo.email.replace(/(.{2})([^@]*)(@.*)/, "$1***$3")
       : "-");
     drawRow("서명 시각", formatKstTime(s.signedAt));
-    drawRow("IP 주소", s.ipAddress || "-");
+    // 🚨 이 문서는 상대 당사자에게 교부된다. 전체 IP 는 특정력도 낮으면서
+    //   프라이버시 비용만 크므로 뒤쪽을 가린다(내부 감사로그에는 전체가 남는다).
+    drawRow("접속 IP", maskIp(s.ipAddress));
     // UA 파싱 (간략화)
     const ua = s.userAgent || "-";
-    const uaShort = ua.length > 70 ? ua.slice(0, 67) + "..." : ua;
+    const uaShort = ua.length > 60 ? ua.slice(0, 57) + "..." : ua;
     drawRow("접속 기기", uaShort);
-    drawRow("이메일 OTP", s.otpVerified ? "인증 완료 ✓" : "미인증", s.otpVerified ? GREEN : rgb(0.8, 0.2, 0.2));
-    drawRow("문서 해시", s.documentHash, LIGHT);
+    drawRow("본인확인", s.otpVerified ? "이메일 OTP 확인됨" : "미확인", s.otpVerified ? GREEN : rgb(0.8, 0.2, 0.2));
+    drawRow("서명시점 해시", s.documentHash, LIGHT);
 
     // 서명 이미지
     if (s.signatureImageBase64) {
@@ -280,21 +281,47 @@ export async function generateAuditCertificate(
     drawHRule();
   }
 
+  // ─── 해시 명세 ───
+  // 🚨 해시는 "무엇을 대상으로 계산했는지"가 문서에 없으면 검증이 불가능하고,
+  //   상대방이 첨부 PDF 를 해시해 보고 불일치하면 오히려 변조 의심의 근거가 된다.
+  //   이 서비스의 해시 대상은 PDF 파일이 아니라 **약정서 본문 텍스트**다.
+  cy -= 4;
+  drawText("■ 해시 산출 기준", { size: 10, color: DARK });
+  cy -= 4;
+  for (const line of [
+    "위 '서명시점 해시'는 각 당사자가 서명한 시점의 약정서 본문 텍스트를",
+    "UTF-8 로 인코딩한 문자열에 SHA-256 을 적용한 값입니다.",
+    "PDF 파일 자체의 해시가 아니므로, PDF 파일을 해시하면 값이 다릅니다.",
+  ]) {
+    drawText(line, { size: 9, color: MID });
+  }
+
   // ─── 면책 문구 ───
   cy -= 4;
-  drawText("■ 법적 근거 및 면책", { size: 10, color: DARK });
+  drawText("■ 안내", { size: 10, color: DARK });
   cy -= 4;
+  // 🚨🚨 여기에 법적 효과를 단정하는 문장을 다시 넣지 말 것.
+  //   이전 문안에는 아래 세 가지 오류가 있었고 실제로 발급되어 나갔다.
+  //   ① "전자문서법 제4조·전자서명법 제3조에 따라 서명 행위를 증명하는" —
+  //      두 조문은 "전자적 형태라는 이유만으로 효력을 부인하지 않는다"는 차별금지 규정이지
+  //      증명력을 부여하는 규정이 아니다. 조문을 정반대 취지로 인용한 것이다.
+  //   ② "(이용약관 제3조)" — 비로그인 상대방은 약관에 동의한 적이 없어 원용 자체가 성립 안 한다.
+  //   ③ "본인 서명이 아니라고 주장하려면 … 본인과 무관함을 직접 증명하여야 합니다" —
+  //      **증명책임의 방향이 정반대다.** 민사소송법 제357조상 사문서의 진정성립은
+  //      그 문서를 제출하는 쪽이 증명한다. 제358조의 추정도 "그 서명이 본인의 것"이
+  //      먼저 인정되어야 발동한다. 2020년 전자서명법 전부개정으로 공인전자서명의
+  //      진정성립 추정 규정도 삭제되었다. 게다가 이런 문장은 고객에게 증명책임을
+  //      전가하는 것이어서 약관규제법 제14조상 무효 사유가 될 수 있다.
+  //   → 사실 서술만 남긴다. 약한 인증을 강한 것처럼 쓰면 오히려 문서 전체가 탄핵된다.
   const disclaimer = [
-    "본 인증서는 전자문서 및 전자거래 기본법 제4조, 전자서명법 제3조에 따라",
-    `서명 행위를 증명하는 감사 기록이며, ${BRAND}가 자동 발급합니다.`,
+    "본 기록은 전자문서 서명 과정에서 수집된 기술적 정보를 정리한 것으로,",
+    `${BRAND}가 자동 생성합니다. 공적 기관이 발급하는 증명서가 아닙니다.`,
     "",
-    `${BRAND}는 이용자가 제공한 정보를 바탕으로 서비스를 제공하였으며,`,
-    "입력 정보의 정확성에 대한 책임은 이용자에게 있습니다.",
-    "(이용약관 제3조)",
+    "본인확인은 위에 적힌 이메일 주소로 발송한 일회용 인증번호(OTP) 확인에",
+    "한하며, 실명 확인 등 신원확인 절차는 수행되지 않았습니다.",
     "",
-    "서명 당사자가 본인 서명이 아니라고 주장하려면, 해당 이메일 계정·",
-    "IP·기기 정보 등이 본인과 무관함을 직접 증명하여야 합니다.",
-    "(민사소송법상 서명진정성립 추정 원칙)",
+    "본 기록의 증명력과 문서의 진정성립 여부는 법원이 개별적으로 판단합니다.",
+    `${BRAND}는 서명자의 신원이나 문서의 법적 효력을 보증하지 않습니다.`,
   ];
   for (const line of disclaimer) {
     drawText(line, { size: 9, color: line === "" ? MID : MID });

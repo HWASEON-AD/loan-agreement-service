@@ -16,7 +16,12 @@ import type {
 } from "./funding-types";
 import { SELF_FUND_KEYS, LOAN_KEYS } from "./funding-types";
 
-const FONT_PATH = path.join(process.cwd(), "public", "fonts", "NotoSansKR-Regular.otf");
+// 🚨🚨 한글 폰트는 **TTF** 를 써야 한다. NotoSansKR **OTF(CFF)** 는 pdf-lib(fontkit)이
+//   제대로 임베드하지 못해, subset:false 로도 **한글이 엉뚱한 한자로 깨진다.**
+//   (실측: 성명 "홍길동" → "唉", 주소 → "旭 … 埦123". 배경 양식지의 한글은 원본 PDF 라
+//    멀쩡하고 우리가 채워 넣는 값만 깨지기 때문에 눈에 잘 띄지 않았다.)
+//   NanumGothic 은 SIL OFL 이라 임베드·재배포가 자유롭다.
+const FONT_PATH = path.join(process.cwd(), "public", "fonts", "NanumGothic-Regular.ttf");
 const HOUSING_TEMPLATE = path.join(process.cwd(), "public", "forms", "housing-form.pdf");
 
 // Vercel 서버리스 함수에서는 public/ 파일에 fs 접근 불가 → HTTP fallback

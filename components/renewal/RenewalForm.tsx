@@ -222,7 +222,10 @@ export function RenewalForm() {
   //   표시하였습니다"인데, 작성자가 그 사실을 스스로 확인조차 하지 않은 채
   //   문서에 인쇄되어 나가면 안 된다. (요구가 없었던 것을 있었던 것으로 만드는 통로가 된다)
   //   ※ 이것도 '우리가 판정'하는 게 아니라 '이용자가 선언'하는 형식이므로 안전선 안이다.
-  const canBuild = requiredFilled && ckResidential && (!isConfirm || ckRequested);
+  // 🚨 게이트가 아닌 체크박스는 "체크는 안 해도 되는 것"을 학습시켜
+  //   다른 게이트의 무게까지 깎는다. 표시한 확인은 전부 게이트로 둔다.
+  const canBuild =
+    requiredFilled && ckResidential && ckFromContract && (!isConfirm || ckRequested);
 
   async function handleSend() {
     if (!mailTo) return;
@@ -736,6 +739,12 @@ export function RenewalForm() {
                 다음 단계로 진행할 수 없습니다.
               </p>
             )}
+            {ckResidential && !ckFromContract && (
+              <p className="text-xs leading-relaxed text-slate-500">
+                만료일 하루 차이가 기간 계산과 갱신 기간에 그대로 반영되므로, 세 번째 확인 없이는
+                다음 단계로 진행할 수 없습니다.
+              </p>
+            )}
             {isConfirm && ckResidential && !ckRequested && (
               <p className="text-xs leading-relaxed text-slate-500">
                 이 확인서는 <b className="text-slate-700">실제로 있었던 계약갱신 요구</b>를 기록하는
@@ -876,6 +885,12 @@ export function RenewalForm() {
                     placeholder="me@example.com"
                   />
                 </div>
+
+                <p className="mt-3 text-xs leading-relaxed text-slate-500">
+                  발송 메일에 <b className="text-slate-700">답장을 하면 내지마요로 회신됩니다.</b>{" "}
+                  받는 분의 답변은 문자·전화 등 직접 연락 가능한 수단으로 받으시고, 받은 답장은
+                  지우지 말고 보관해 두세요.
+                </p>
 
                 <div className="mt-4">
                   <Button variant="primary" onClick={handleSend} disabled={!mailTo || sending}>

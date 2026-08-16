@@ -8,7 +8,7 @@
 //
 // ★ 이 파일은 순수 변환만 한다. LLM 호출 0회, 입력값을 고정 서식에 그대로 배치할 뿐이다.
 
-import { calcRenewedEndDate, formatDotDate } from "./renewal-calc";
+import { calcRenewedEndDate, formatDotDate, isValidDate } from "./renewal-calc";
 import type { RenewalNotice } from "./renewal-text";
 
 // ---------------------------------------------------------------------------
@@ -251,9 +251,22 @@ export function buildNoticeDoc(n: RenewalNotice): FormDoc {
 export function buildConfirmParagraphs(n: RenewalNotice): string[][] {
   const requestDate = n.renewalRequestDate ? formatDotDate(n.renewalRequestDate) : "";
   return [
+    // 🚨🚨 이 문장을 빼지 말 것.
+    //   화면의 경고("없었던 것을 있었던 것으로 적는 용도가 아님")는 **작성자만** 본다.
+    //   서명하는 상대방은 종이 한 장만 보므로, 문서 자체가 자기 용도를 밝혀야 한다.
+    //   주어가 '이 확인서'라 개별 사안 판정이 아니다(안전선 안).
     [
+      "이 확인서는 실제로 있었던 계약갱신 요구를 기록하기 위한 것이며,",
+      "그러한 요구가 없었던 경우에 이를 있었던 것으로 정하기 위한 것이 아닙니다.",
+    ],
+    [
+      // 🚨 "제6조의3 제1항에 **따른**" 이라고 쓰지 말 것.
+      //   그 표현은 "기간 내에, 소진되지 않은 권리로, 적법하게 행사되었다"는 **법적 성질결정**을
+      //   함축한다. 서비스는 그 어느 것도 검증하지 않으며, 약관 제7조⑤도 "그러한 취지의 문구를
+      //   자동 삽입하지 않는다"고 선언하고 있다. 문구와 약관 중 하나가 거짓이 되면 안 된다.
+      //   → 조문 인용을 빼고 '있었던 사실'만 적는다.
       `임차인은 ${requestDate} 임대인에게 위 주택임대차계약에 관하여`,
-      "주택임대차보호법 제6조의3 제1항에 따른 계약갱신 요구의 의사를 표시하였습니다.",
+      "계약갱신 요구의 의사를 표시하였습니다.",
     ],
     [
       "임대인과 임차인은 위 임대차계약이 임차인의 위 계약갱신 요구에 따라",
@@ -308,10 +321,13 @@ export function buildConfirmNotes(lawLabel?: string): string[][] {
       "같은 조 제1항 본문 및 제6조 제1항 전단 : 계약갱신의 요구는 임대차기간이 끝나기 6개월 전부터 2개월 전까지의 기간에 하는 것으로 정해져 있습니다.",
     ],
     [
-      "같은 조 제4항 : 임차인은 위 갱신요구에 따라 갱신된 임대차에 대하여도 언제든지 임대인에게 계약해지를 통지할 수 있고, 임대인이 그 통지를 받은 날부터 3개월이 지나면 해지의 효력이 발생합니다.",
+      "같은 조 제4항 및 이에 따라 준용되는 제6조의2 : 임차인은 갱신된 임대차에 대하여 언제든지 임대인에게 계약해지를 통지할 수 있고, 임대인이 그 통지를 받은 날부터 3개월이 지나면 해지의 효력이 발생합니다.",
     ],
     [
-      "같은 조 제3항 및 제7조 : 갱신되는 임대차의 차임과 보증금의 증액은 약정한 차임·보증금의 20분의 1의 금액을 초과하지 못합니다.",
+      "같은 조 제3항 및 제7조 제2항 본문 : 갱신되는 임대차의 차임과 보증금의 증액청구는 약정한 차임·보증금의 20분의 1의 금액을 초과하지 못합니다. 다만 같은 항 단서는 시·도가 조례로 상한을 달리 정할 수 있도록 하고 있습니다.",
+    ],
+    [
+      "제7조 제1항 후단 : 증액청구는 임대차계약 또는 약정한 차임·보증금의 증액이 있은 후 1년 이내에는 하지 못합니다.",
     ],
     [
       "국토교통부·법무부 「개정 주택임대차보호법 해설집」은 같은 법 제6조에 따른 묵시적 갱신은 계약갱신요구권의 행사로 보지 않는다는 입장입니다.",
@@ -421,8 +437,25 @@ export function docTitleOf(kind: DocKind): string {
 //   임의 제목·임의 본문을 아무에게나 보낼 수 있는 **발송기**가 된다(피싱 악용).
 //   → 서버는 '구조'만 받고 문장은 서버가 조립한다. 이용자 입력은 칸 안의 값으로만 들어간다.
 
-/** 한 칸에 들어갈 수 있는 최대 길이 — 서식의 칸이지 자유 게시판이 아니다 */
-const MAX_FIELD_LEN = 200;
+/**
+ * 칸별 최대 길이 — 서식의 칸이지 자유 게시판이 아니다.
+ *
+ * 🚨 전부 200자로 두면 안 된다. 당사자 표의 값 칸 폭은 약 145pt 라
+ *   9.5pt 한글 기준 한 줄 15자 남짓이다. 주소에 200자를 넣으면 한 칸이 13~14줄이 되어
+ *   **확인서가 A4 한 장을 넘기고 둘째 장에 서명란만 남는다.**
+ *   길이를 의미에 맞게 줄이는 것이 레이아웃 방어인 동시에, 서식 칸을 메시지 게시판으로
+ *   쓰는 발송 악용에 대한 방어이기도 하다.
+ */
+const FIELD_LIMITS: Record<string, number> = {
+  propertyAddress: 100,
+  tenantName: 30,
+  tenantPhone: 20,
+  tenantAddress: 100,
+  landlordName: 30,
+  landlordPhone: 20,
+  landlordAddress: 100,
+};
+const MAX_FIELD_LEN = 100;
 
 /**
  * 서식 칸에 들어갈 수 있는 값인가.
@@ -431,9 +464,9 @@ const MAX_FIELD_LEN = 200;
  *   반대로 링크를 허용하면 "우리 도메인에서 발송되는 메일에 임의 링크를 심는" 통로가 남는다.
  *   제어문자도 막는다(헤더 인젝션·본문 조작 방지).
  */
-function okField(v: unknown): boolean {
+function okField(v: unknown, limit = MAX_FIELD_LEN): boolean {
   if (typeof v !== "string") return false;
-  if (v.length > MAX_FIELD_LEN) return false;
+  if (v.length > limit) return false;
   for (let i = 0; i < v.length; i++) {
     const code = v.charCodeAt(i);
     if (code < 32 || code === 127) return false;
@@ -442,8 +475,12 @@ function okField(v: unknown): boolean {
   return true;
 }
 
+// 🚨 정규식만 보면 2026-02-31 같은 실재하지 않는 날짜가 통과한다.
+//   달력상 실재 여부까지 확인한다(isValidDate).
 function okDate(v: unknown): boolean {
-  return typeof v === "string" && (v === "" || /^\d{4}-\d{2}-\d{2}$/.test(v));
+  if (typeof v !== "string") return false;
+  if (v === "") return true;
+  return /^\d{4}-\d{2}-\d{2}$/.test(v) && isValidDate(v);
 }
 
 function okMoney(v: unknown): boolean {
@@ -468,13 +505,17 @@ export function isRenewalInput(v: unknown): v is RenewalNotice {
   ];
   for (const k of texts) {
     if (n[k] === undefined) continue;
-    if (!okField(n[k])) return false;
+    if (!okField(n[k], FIELD_LIMITS[k])) return false;
   }
   // 필수 칸은 비어 있으면 안 된다. 화면에서 막고 있지만 API 는 직접 호출될 수 있고,
   // 성명이 빈 확인서가 만들어지면 그 자체로 분쟁의 소지가 된다.
-  const required = [n.propertyAddress, n.tenantName, n.landlordName];
-  for (const v of required) {
-    if (!okField(v) || (v as string).trim() === "") return false;
+  const required: [unknown, number][] = [
+    [n.propertyAddress, FIELD_LIMITS.propertyAddress],
+    [n.tenantName, FIELD_LIMITS.tenantName],
+    [n.landlordName, FIELD_LIMITS.landlordName],
+  ];
+  for (const [v, limit] of required) {
+    if (!okField(v, limit) || (v as string).trim() === "") return false;
   }
 
   const dates = [
@@ -488,6 +529,14 @@ export function isRenewalInput(v: unknown): v is RenewalNotice {
   for (const v of [n.startDate, n.endDate, n.noticeDate]) {
     if (!okDate(v) || v === "") return false;
   }
+  // 🚨 논리적으로 불가능한 날짜는 막는다. 이건 '법적 판정'이 아니라 산술이다.
+  //   ① 만료일이 시작일보다 앞설 수 없다
+  //   ② 확인서의 '계약갱신 요구일'은 **이미 있었던 사실**이므로 미래일 수 없다
+  //     (미래 날짜가 통과하면 문서가 스스로 불능인 사실을 증명하게 된다)
+  if ((n.endDate as string) < (n.startDate as string)) return false;
+  if (n.renewalRequestDate) {
+    if ((n.renewalRequestDate as string) > (n.noticeDate as string)) return false;
+  }
 
   if (typeof n.hasMonthlyRent !== "boolean") return false;
   if (typeof n.deposit !== "number" || !Number.isFinite(n.deposit) || n.deposit < 0) return false;
@@ -496,6 +545,19 @@ export function isRenewalInput(v: unknown): v is RenewalNotice {
   }
   if (n.condition !== "same" && n.condition !== "negotiate") return false;
 
+  return true;
+}
+
+/**
+ * 확인서 전용 필수값 검증.
+ * 🚨 갱신 요구일은 이 서식의 존재 이유다. 비어 있으면 본문이
+ *   "임차인은 (빈칸) 임대인에게 … 의사를 표시하였습니다" 가 되어 문서가 무의미해진다.
+ */
+export function isConfirmInput(n: RenewalNotice): boolean {
+  if (!n.renewalRequestDate || !isValidDate(n.renewalRequestDate)) return false;
+  if (!n.renewedStartDate || !isValidDate(n.renewedStartDate)) return false;
+  if (!n.renewedEndDate || !isValidDate(n.renewedEndDate)) return false;
+  if (n.renewedEndDate < n.renewedStartDate) return false;
   return true;
 }
 
