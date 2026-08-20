@@ -1,13 +1,21 @@
-// 계약갱신 요구 통지서 PDF 생성 (pdf-lib + fontkit 한글 임베드)
+// 계약갱신 관련 서식(통지서·확인서) PDF 생성 — pdf-lib + fontkit 한글 임베드
 //
 // ★ 서버 사이드 전용 (Node fs 사용).
-// ★ 생성만 하고 저장하지 않는다 — 통지서에는 임대인·임차인 실명과 주소가 들어간다.
+// ★ 생성만 하고 저장하지 않는다 — 서식에는 임대인·임차인 실명과 주소가 들어간다.
 //   (생성 문서 DB 미보관 원칙)
+// ★ LLM 호출 0회. FormDoc 구조체를 고정 서식(표)에 그대로 배치하기만 한다.
+//
+// ★★ 서식이 깨지지 않게 하는 원칙
+//   예전 구현은 서식을 긴 문자열로 만들어 한 줄씩 흘려 그렸다. 그러면 표를 공백으로
+//   흉내내야 하고, 값이 한 글자만 길어져도 칸이 밀린다. 지금은 실제 표를 그린다.
+//   ① 셀 안에서 줄바꿈시키고 ② 줄 수에 맞춰 행 높이를 늘리고 ③ 블록이 페이지에 안 들어가면
+//   페이지를 넘긴다. 이 세 가지 때문에 값이 길어져도 서식이 무너지지 않는다.
 
-import { PDFDocument, rgb, type PDFFont } from "pdf-lib";
+import { PDFDocument, rgb, type PDFFont, type PDFPage, type RGB } from "pdf-lib";
 import fontkit from "@pdf-lib/fontkit";
 import { readFile } from "fs/promises";
 import path from "path";
+import { numberedHeadings, type DocCell, type FormDoc } from "./renewal-doc";
 
 // 🚨 폰트는 반드시 **TTF** 를, **subset:false** 로 임베드할 것. (실측으로 확인한 결과)
 //
@@ -48,28 +56,291 @@ async function loadFontBytes(): Promise<Uint8Array | null> {
   return null;
 }
 
-// 긴 줄을 페이지 폭에 맞게 줄바꿈 (한글 포함이라 문자 단위).
-// 들여쓰기(선행 공백)는 이어지는 줄에도 유지해 서식이 무너지지 않게 한다.
-function wrapLine(font: PDFFont, text: string, size: number, maxWidth: number): string[] {
-  if (text === "") return [""];
-  const indent = text.match(/^\s*/)?.[0] ?? "";
-  const lines: string[] = [];
-  let current = "";
+// ---------------------------------------------------------------------------
+// 서식 치수 — 전부 여기 모아 둔다 (한 곳만 고치면 서식 전체가 같이 움직인다)
+// ---------------------------------------------------------------------------
+const PAGE = { w: 595.28, h: 841.89 }; // A4
+const MARGIN = 50;
+const CONTENT_W = PAGE.w - MARGIN * 2; // 495.28
+const TABLE_INDENT = 14; // 섹션 제목보다 표를 조금 들여쓴다 (원 서식과 동일)
+const TABLE_X = MARGIN + TABLE_INDENT;
+const TABLE_W = CONTENT_W - TABLE_INDENT;
+
+const CELL_PAD_X = 7;
+const CELL_SIZE = 9.5;
+
+const BODY_SIZE = 10;
+const HEAD_SIZE = 11;
+
+/**
+ * 서식 밀도.
+ *
+ * 🚨 통지서(블록 3개)와 확인서(블록 5개)를 같은 치수로 그리면 둘 중 하나가 망가진다.
+ *   - 확인서 기준으로 조이면 → 통지서는 A4에 여백이 크게 남아 원 서식보다 옹색해진다
+ *   - 통지서 기준으로 벌리면 → 확인서가 A4 한 장을 넘겨 **둘째 장에 서명란만** 남는다
+ *   → 블록 수로 밀도를 나눈다. 둘 다 한 장에 들어가면서 통지서는 원 서식의 여유를 유지한다.
+ *
+ * ★ 치수를 손대면 **반드시 확인서를 다시 렌더해 1페이지인지 확인할 것.**
+ */
+type Metrics = {
+  cellPadY: number;
+  cellLh: number;
+  cellMinH: number;
+  bodyLh: number;
+  bodyPad: number;
+  bodyParaGap: number;
+  headGapAbove: number;
+  headGapBelow: number;
+  /** 본문 상자 아래 여유 (원 서식의 넉넉한 통지 상자를 재현) */
+  bodySlack: number;
+  noteSize: number;
+  noteLh: number;
+  noteParaGap: number;
+};
+
+const ROOMY: Metrics = {
+  cellPadY: 6,
+  cellLh: 14,
+  cellMinH: 30,
+  bodyLh: 17,
+  bodyPad: 13,
+  bodyParaGap: 9,
+  headGapAbove: 19,
+  headGapBelow: 8,
+  bodySlack: 18,
+  noteSize: 8.5,
+  noteLh: 11,
+  noteParaGap: 4,
+};
+
+const TIGHT: Metrics = {
+  cellPadY: 5,
+  cellLh: 13.5,
+  cellMinH: 24,
+  bodyLh: 16,
+  bodyPad: 11,
+  bodyParaGap: 8,
+  headGapAbove: 12,
+  headGapBelow: 6,
+  bodySlack: 0,
+  noteSize: 8.5,
+  noteLh: 10.5,
+  noteParaGap: 3.5,
+};
+
+/**
+ * 최후 밀도.
+ * 🚨 A4 한 장 제약을 '치수 상수를 조심히 다루자'는 규율로만 두면 반드시 깨진다.
+ *   참고란에 조문을 정확히 채우거나 이용자가 긴 주소를 넣으면 실제로 2페이지가 됐다(실측).
+ *   → 1차 렌더가 넘치면 이 밀도로 자동 재시도한다. 사람이 상수를 맞추지 않아도 된다.
+ */
+const ULTRA: Metrics = {
+  cellPadY: 4,
+  cellLh: 12.5,
+  cellMinH: 21,
+  bodyLh: 14.5,
+  bodyPad: 9,
+  bodyParaGap: 6,
+  headGapAbove: 9,
+  headGapBelow: 4,
+  bodySlack: 0,
+  noteSize: 8,
+  noteLh: 9.5,
+  noteParaGap: 3,
+};
+
+// 색 (화면 미리보기와 같은 슬레이트 계열)
+const C_TEXT = rgb(0.12, 0.16, 0.22);
+const C_TITLE = rgb(0.06, 0.09, 0.16);
+const C_MUTED = rgb(0.42, 0.47, 0.55);
+const C_BORDER = rgb(0.78, 0.81, 0.85);
+const C_FILL = rgb(0.957, 0.965, 0.976);
+
+// ---------------------------------------------------------------------------
+// 텍스트 유틸
+// ---------------------------------------------------------------------------
+
+/**
+ * 폭에 맞춰 줄바꿈.
+ * 한글은 어디서 끊어도 되지만 영문·숫자·전화번호는 단어 중간에서 끊기면 읽기 나쁘므로
+ * "ASCII 연속 구간"을 하나의 토큰으로 묶어서 처리한다.
+ */
+function wrapText(font: PDFFont, text: string, size: number, maxWidth: number): string[] {
+  if (!text) return [""];
+  if (maxWidth <= 0) return [text];
+
+  const tokens: string[] = [];
+  let ascii = "";
   for (const ch of text) {
-    const test = current + ch;
-    if (font.widthOfTextAtSize(test, size) > maxWidth && current !== "") {
-      lines.push(current);
-      current = indent + ch;
+    if (/[A-Za-z0-9.,:/@~\-_+()%]/.test(ch)) {
+      ascii += ch;
+      continue;
+    }
+    if (ascii) {
+      tokens.push(ascii);
+      ascii = "";
+    }
+    tokens.push(ch);
+  }
+  if (ascii) tokens.push(ascii);
+
+  const lines: string[] = [];
+  let cur = "";
+  const widthOf = (s: string) => font.widthOfTextAtSize(s, size);
+
+  for (const token of tokens) {
+    // 토큰 하나가 이미 폭을 넘으면 글자 단위로 쪼갠다 (무한루프 방지)
+    if (widthOf(token) > maxWidth) {
+      for (const ch of token) {
+        if (cur && widthOf(cur + ch) > maxWidth) {
+          lines.push(cur);
+          cur = "";
+        }
+        cur += ch;
+      }
+      continue;
+    }
+    if (cur && widthOf(cur + token) > maxWidth) {
+      lines.push(cur.replace(/\s+$/, ""));
+      cur = token === " " ? "" : token; // 줄 첫머리 공백은 버린다
     } else {
-      current = test;
+      cur += token;
     }
   }
-  if (current !== "") lines.push(current);
-  return lines;
+  if (cur !== "") lines.push(cur.replace(/\s+$/, ""));
+  return lines.length ? lines : [""];
 }
 
-/** 통지서 텍스트 → PDF 바이트 */
-export async function generateRenewalNoticePdf(noticeText: string): Promise<Uint8Array> {
+/** 강제 줄바꿈(\n)을 존중하면서 폭에 맞춰 줄바꿈 */
+function wrapMultiline(font: PDFFont, text: string, size: number, maxWidth: number): string[] {
+  const out: string[] = [];
+  for (const seg of text.split("\n")) {
+    for (const ln of wrapText(font, seg, size, maxWidth)) out.push(ln);
+  }
+  return out;
+}
+
+/** 굵게 — NanumGothic 은 Regular 만 임베드하므로 살짝 겹쳐 그려 굵기를 흉내낸다 */
+function drawText(
+  page: PDFPage,
+  font: PDFFont,
+  text: string,
+  x: number,
+  y: number,
+  size: number,
+  color: RGB,
+  bold = false
+) {
+  if (text === "") return;
+  page.drawText(text, { x, y, size, font, color });
+  if (bold) {
+    page.drawText(text, { x: x + 0.28, y, size, font, color });
+    page.drawText(text, { x, y: y + 0.22, size, font, color });
+  }
+}
+
+/** 자간을 벌린 글자 폭 */
+function spacedWidth(font: PDFFont, text: string, size: number, spacing: number): number {
+  const chars = [...text];
+  return (
+    chars.reduce((sum, ch) => sum + font.widthOfTextAtSize(ch, size), 0) +
+    spacing * Math.max(0, chars.length - 1)
+  );
+}
+
+/** 자간을 벌려 그리기 — 원 서식의 "계 약 갱 신 요 구 통 지 서" 표기 */
+function drawSpacedText(
+  page: PDFPage,
+  font: PDFFont,
+  text: string,
+  x: number,
+  y: number,
+  size: number,
+  spacing: number,
+  color: RGB,
+  bold = false
+) {
+  let cursor = x;
+  for (const ch of [...text]) {
+    drawText(page, font, ch, cursor, y, size, color, bold);
+    cursor += font.widthOfTextAtSize(ch, size) + spacing;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 표 측정 · 그리기
+// ---------------------------------------------------------------------------
+type MeasuredRow = { cells: DocCell[]; lines: string[][]; height: number };
+
+function measureTable(
+  font: PDFFont,
+  colWidths: number[],
+  rows: DocCell[][],
+  M: Metrics
+): MeasuredRow[] {
+  return rows.map((cells) => {
+    const lines = cells.map((cell, i) =>
+      wrapMultiline(font, cell.text, CELL_SIZE, colWidths[i] - CELL_PAD_X * 2)
+    );
+    const maxLines = Math.max(...lines.map((l) => l.length));
+    return {
+      cells,
+      lines,
+      height: Math.max(M.cellMinH, maxLines * M.cellLh + M.cellPadY * 2),
+    };
+  });
+}
+
+/** 측정된 표를 그린다. 반환값 = 표 아래쪽 y */
+function drawTable(
+  page: PDFPage,
+  font: PDFFont,
+  x: number,
+  yTop: number,
+  colWidths: number[],
+  measured: MeasuredRow[],
+  M: Metrics
+): number {
+  let y = yTop;
+  for (const { cells, lines, height } of measured) {
+    let cx = x;
+    cells.forEach((cell, i) => {
+      const w = colWidths[i];
+      page.drawRectangle({
+        x: cx,
+        y: y - height,
+        width: w,
+        height,
+        borderColor: C_BORDER,
+        borderWidth: 0.8,
+        color: cell.fill ? C_FILL : undefined,
+      });
+
+      const ls = lines[i];
+      const padTop = (height - ls.length * M.cellLh) / 2;
+      ls.forEach((ln, li) => {
+        const lineTop = y - padTop - li * M.cellLh;
+        const baseline = lineTop - M.cellLh / 2 - CELL_SIZE * 0.36;
+        const tw = font.widthOfTextAtSize(ln, CELL_SIZE);
+        const tx = cell.align === "center" ? cx + (w - tw) / 2 : cx + CELL_PAD_X;
+        drawText(page, font, ln, tx, baseline, CELL_SIZE, C_TEXT, cell.bold);
+      });
+      cx += w;
+    });
+    y -= height;
+  }
+  return y;
+}
+
+// ---------------------------------------------------------------------------
+// 본체
+// ---------------------------------------------------------------------------
+
+/** FormDoc → PDF 바이트 */
+export async function generateRenewalNoticePdf(
+  doc: FormDoc,
+  forcedMetrics?: Metrics
+): Promise<{ bytes: Uint8Array; pageCount: number }> {
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
 
@@ -83,57 +354,223 @@ export async function generateRenewalNoticePdf(noticeText: string): Promise<Uint
     font = await pdfDoc.embedFont(StandardFonts.Helvetica);
   }
 
-  const A4 = { width: 595.28, height: 841.89 };
-  const margin = 56;   // 기존 약정서 PDF(pdf-generator.ts)와 동일한 여백
-  const fontSize = 11;
-  const maxWidth = A4.width - margin * 2;
+  // 블록이 많은 서식(확인서)은 조여 그려야 A4 한 장에 들어간다.
+  const M: Metrics = forcedMetrics ?? (doc.blocks.length <= 3 ? ROOMY : TIGHT);
 
-  let page = pdfDoc.addPage([A4.width, A4.height]);
-  let cursorY = A4.height - margin;
+  let page = pdfDoc.addPage([PAGE.w, PAGE.h]);
+  let y = PAGE.h - MARGIN;
+  const bottom = MARGIN;
 
-  // 본문 끝의 빈 줄은 제거한다 — 안 그러면 빈 줄이 커서를 밀어내 백지 페이지가 하나 더 생긴다.
-  const lines = noticeText.replace(/\s+$/, "").split("\n");
+  const newPage = () => {
+    page = pdfDoc.addPage([PAGE.w, PAGE.h]);
+    y = PAGE.h - MARGIN;
+  };
+  /** 남은 높이가 need 보다 작으면 페이지를 넘긴다 */
+  const ensure = (need: number) => {
+    if (y - need < bottom) newPage();
+  };
 
-  lines.forEach((line, idx) => {
-    // 첫 줄 = 제목. 가운데 정렬 + 큰 글씨
-    if (idx === 0) {
-      const titleSize = 20;   // 기존 약정서 PDF와 동일한 제목 크기
-      const titleWidth = font.widthOfTextAtSize(line.trim(), titleSize);
-      page.drawText(line.trim(), {
-        x: (A4.width - titleWidth) / 2,
-        y: cursorY,
-        size: titleSize,
-        font,
-        color: rgb(0.06, 0.13, 0.34),
-      });
-      cursorY -= titleSize + 26;
+  // ── 제목 ────────────────────────────────────────────────────────────────
+  // 원 서식처럼 글자마다 같은 간격으로 벌린다. 제목 안의 공백은 빼고 그려야
+  // "주 택 임 대 차 계 약  갱 신  확 인 서" 처럼 중간만 벌어지지 않는다.
+  const titleSize = 19;
+  const titleSpacing = 6;
+  const titleText = doc.title.replace(/\s+/g, "");
+  const tw = spacedWidth(font, titleText, titleSize, titleSpacing);
+  y -= 16;
+  drawSpacedText(
+    page,
+    font,
+    titleText,
+    (PAGE.w - tw) / 2,
+    y - titleSize,
+    titleSize,
+    titleSpacing,
+    C_TITLE,
+    true
+  );
+  y -= titleSize + 11;
+  page.drawRectangle({ x: MARGIN, y, width: CONTENT_W, height: 1.6, color: C_TITLE });
+  y -= 3;
+
+  const headings = numberedHeadings(doc.blocks);
+
+  const drawHeading = (text: string, muted = false) => {
+    ensure(M.headGapAbove + HEAD_SIZE + M.headGapBelow + 20);
+    y -= M.headGapAbove;
+    drawText(
+      page,
+      font,
+      text,
+      MARGIN,
+      y - HEAD_SIZE,
+      muted ? HEAD_SIZE - 1.5 : HEAD_SIZE,
+      muted ? C_MUTED : C_TITLE,
+      true
+    );
+    y -= (muted ? HEAD_SIZE - 1.5 : HEAD_SIZE) + M.headGapBelow;
+  };
+
+  doc.blocks.forEach((block, bi) => {
+    if (block.kind === "table") {
+      const colWidths = block.colRatios.map((r) => TABLE_W * r);
+      const measured = measureTable(font, colWidths, block.rows, M);
+      const h = measured.reduce((s, r) => s + r.height, 0);
+      drawHeading(headings[bi]);
+      ensure(h);
+      y = drawTable(page, font, TABLE_X, y, colWidths, measured, M);
       return;
     }
 
-    for (const ln of wrapLine(font, line, fontSize, maxWidth)) {
-      // 페이지 넘김은 '실제로 그릴 글자가 있을 때'만 판단한다.
-      // 빈 줄에서 페이지를 넘기면 백지 페이지가 생긴다.
-      if (ln !== "") {
-        if (cursorY < margin + fontSize * 2) {
-          page = pdfDoc.addPage([A4.width, A4.height]);
-          cursorY = A4.height - margin;
+    if (block.kind === "body") {
+      drawHeading(headings[bi]);
+
+      // 문단 → 그릴 줄 목록 (빈 문자열은 문단 사이 간격을 뜻한다)
+      const maxW = TABLE_W - M.bodyPad * 2;
+      const lines: string[] = [];
+      block.paragraphs.forEach((para, pi) => {
+        if (pi > 0) lines.push("");
+        para.forEach((line) => wrapText(font, line, BODY_SIZE, maxW).forEach((l) => lines.push(l)));
+      });
+
+      const advance = (ln: string) => (ln === "" ? M.bodyParaGap : M.bodyLh);
+      const totalH = lines.reduce((s, ln) => s + advance(ln), 0);
+
+      // 상자가 페이지에 안 들어가면 조각내어 이어 그린다 (조각마다 테두리를 닫는다)
+      let idx = 0;
+      let first = true;
+      while (idx < lines.length) {
+        if (y - (M.bodyPad * 2 + M.bodyLh) < bottom) newPage();
+
+        const avail = y - bottom - M.bodyPad * 2;
+        let used = 0;
+        const chunk: string[] = [];
+        while (idx < lines.length && used + advance(lines[idx]) <= avail) {
+          used += advance(lines[idx]);
+          chunk.push(lines[idx]);
+          idx++;
         }
-        page.drawText(ln, {
-          x: margin,
-          y: cursorY,
-          size: fontSize,
-          font,
-          color: rgb(0.1, 0.1, 0.15),
+        if (chunk.length === 0 && idx < lines.length) {
+          // 한 줄도 못 넣을 정도면(방어) 강제로 한 줄은 넣는다
+          used += advance(lines[idx]);
+          chunk.push(lines[idx]);
+          idx++;
+        }
+
+        // 한 장에 다 들어간 경우엔 원 서식처럼 상자 아래에 여유를 준다 (여유값은 밀도가 정한다)
+        const slack = first && idx >= lines.length && totalH < 420 ? M.bodySlack : 0;
+        const boxH = used + M.bodyPad * 2 + slack;
+        page.drawRectangle({
+          x: TABLE_X,
+          y: y - boxH,
+          width: TABLE_W,
+          height: boxH,
+          borderColor: C_BORDER,
+          borderWidth: 0.8,
         });
+
+        let ly = y - M.bodyPad;
+        for (const ln of chunk) {
+          if (ln === "") {
+            ly -= M.bodyParaGap;
+            continue;
+          }
+          drawText(page, font, ln, TABLE_X + M.bodyPad, ly - BODY_SIZE, BODY_SIZE, C_TEXT);
+          ly -= M.bodyLh;
+        }
+        y -= boxH;
+        first = false;
       }
-      cursorY -= fontSize + 8;
+      return;
+    }
+
+    // note — 테두리 없이 작은 글씨. 주어가 법령·해설인 문장만 들어온다.
+    //
+    // ★ 들여쓰기는 본문 상자 '안쪽 글자'와 같은 열(TABLE_X + bodyPad)에 맞춘다.
+    //   상자가 없다고 테두리 위치(TABLE_X)에 맞추면 참고 문단만 왼쪽으로 튀어나와 보인다.
+    const noteX = TABLE_X + M.bodyPad;
+    const maxW = TABLE_W - M.bodyPad * 2;
+    const noteLines: string[] = [];
+    block.paragraphs.forEach((para, pi) => {
+      if (pi > 0) noteLines.push("");
+      para.forEach((line) => wrapText(font, line, M.noteSize, maxW).forEach((l) => noteLines.push(l)));
+    });
+    const noteH = noteLines.reduce((s, ln) => s + (ln === "" ? M.noteParaGap : M.noteLh), 0);
+    drawHeading(headings[bi], true);
+    ensure(noteH);
+    for (const ln of noteLines) {
+      if (ln === "") {
+        y -= M.noteParaGap;
+        continue;
+      }
+      if (y - M.noteLh < bottom) newPage();
+      drawText(page, font, ln, noteX, y - M.noteSize, M.noteSize, C_MUTED);
+      y -= M.noteLh;
     }
   });
 
-  return await pdfDoc.save();
+  // ── 날짜 · 서명란 ───────────────────────────────────────────────────────
+  const dateSize = 11;
+  const signSize = 11;
+  const signRowH = 30;
+  ensure(16 + dateSize + 18 + signRowH * doc.signatures.length);
+
+  y -= 16;
+  const dw = spacedWidth(font, doc.dateText, dateSize, 1.2);
+  drawSpacedText(page, font, doc.dateText, (PAGE.w - dw) / 2, y - dateSize, dateSize, 1.2, C_TEXT);
+  y -= dateSize + 18;
+
+  // 오른쪽 정렬 서명 블록 — 라벨 / 성명 / (서명 또는 날인) 을 한 줄에 두고 밑줄을 긋는다.
+  // 라벨 폭은 서명란이 여러 줄일 때 세로로 맞아야 하므로 가장 긴 라벨 기준으로 통일한다.
+  const right = MARGIN + CONTENT_W;
+  const suffix = "(서명 또는 날인)";
+  const suffixW = font.widthOfTextAtSize(suffix, signSize - 1);
+  const labelW = Math.max(...doc.signatures.map((s) => font.widthOfTextAtSize(s.label, signSize)));
+  const nameW = Math.max(
+    96,
+    ...doc.signatures.map((s) => font.widthOfTextAtSize(s.name, signSize) + 24)
+  );
+  const suffixX = right - suffixW;
+  const nameX = suffixX - 14 - nameW;
+  const labelX = nameX - 12 - labelW;
+
+  for (const sig of doc.signatures) {
+    ensure(signRowH);
+    drawText(page, font, sig.label, labelX, y - signSize, signSize, C_TITLE, true);
+    drawText(
+      page,
+      font,
+      sig.name,
+      nameX + (nameW - font.widthOfTextAtSize(sig.name, signSize)) / 2,
+      y - signSize,
+      signSize,
+      C_TEXT
+    );
+    drawText(page, font, suffix, suffixX, y - signSize, signSize - 1, C_TEXT);
+    page.drawRectangle({
+      x: nameX,
+      y: y - signSize - 9,
+      width: right - nameX,
+      height: 0.9,
+      color: C_TEXT,
+    });
+    y -= signRowH;
+  }
+
+  // 🚨 1페이지 제약을 '치수 상수를 조심히 다루자'는 규율로만 두면 6개월 뒤에 죽는다.
+  //   확인서가 둘째 장에 서명란만 남기고 쪼개지는 사고를 기계가 막는다.
+  //   (호출부가 이 정보를 보고 판단할 수 있도록 페이지 수를 함께 돌려준다)
+  const pageCount = pdfDoc.getPageCount();
+  // 넘쳤으면 더 조인 밀도로 한 번 더 그려 본다 (사람이 상수를 맞추지 않아도 되게)
+  if (pageCount > 1 && !forcedMetrics) {
+    const retry = await generateRenewalNoticePdf(doc, ULTRA);
+    if (retry.pageCount <= pageCount) return retry;
+  }
+  const bytes = await pdfDoc.save();
+  return { bytes, pageCount };
 }
 
-/** 다운로드 파일명 — 계약갱신요구통지서_YYYYMMDD.pdf */
-export function renewalPdfFilename(dateYmd: string): string {
-  return `계약갱신요구통지서_${dateYmd.replace(/-/g, "")}.pdf`;
+/** 다운로드 파일명 — {문서명}_YYYYMMDD.pdf */
+export function renewalPdfFilename(dateYmd: string, title = "계약갱신요구통지서"): string {
+  return `${title.replace(/\s/g, "")}_${dateYmd.replace(/-/g, "")}.pdf`;
 }

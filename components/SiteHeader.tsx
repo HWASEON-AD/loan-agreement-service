@@ -20,7 +20,7 @@ function Logo() {
 const NAV_ITEMS = [
   { href: "/create/step/1", label: "약정서 작성" },
   { href: "/funding-plan", label: "자금조달계획서 AI 자동작성" },
-  { href: "/renewal", label: "계약갱신 요구 통지서" },
+  { href: "/renewal", label: "계약갱신 서식" },
   { href: "/#tax-consult", label: "세무상담" },
 ];
 
