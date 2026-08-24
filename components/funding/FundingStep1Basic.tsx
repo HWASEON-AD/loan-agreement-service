@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
+import { formatPhone, isMobilePhone } from "@/lib/phone";
 import { Card } from "@/components/ui/Card";
 import type {
   FundingStep1Data,
@@ -19,14 +20,6 @@ interface Props {
 function digitsOnly(s: string, maxLen?: number): string {
   const d = s.replace(/\D/g, "");
   return maxLen !== undefined ? d.slice(0, maxLen) : d;
-}
-
-// 휴대전화 자동 포맷 (010-XXXX-XXXX)
-function formatPhone(s: string): string {
-  const d = digitsOnly(s, 11);
-  if (d.length < 4) return d;
-  if (d.length < 8) return `${d.slice(0, 3)}-${d.slice(3)}`;
-  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
 }
 
 // 콤마 표시 (숫자 입력용)
@@ -102,7 +95,7 @@ export function FundingStep1Basic({ initialData, onNext }: Props) {
     if (idBack.length !== 7 || !/^\d{7}$/.test(idBack))
       errs.idBack = "주민등록번호 뒤 7자리를 입력해주세요.";
     if (address.trim().length < 5) errs.address = "주소를 입력해주세요.";
-    if (!/^010-\d{4}-\d{4}$/.test(phone))
+    if (!isMobilePhone(phone))
       errs.phone = "휴대전화 번호 형식이 올바르지 않습니다.";
 
     if (formType === "housing") {
@@ -135,7 +128,7 @@ export function FundingStep1Basic({ initialData, onNext }: Props) {
     /^\d{6}$/.test(idFront) &&
     /^\d{7}$/.test(idBack) &&
     address.trim().length >= 5 &&
-    /^010-\d{4}-\d{4}$/.test(phone);
+    isMobilePhone(phone);
   const tradeValid =
     formType === "housing"
       ? parseAmount(tradeAmountStr) > 0

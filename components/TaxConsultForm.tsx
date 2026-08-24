@@ -2,10 +2,9 @@
 
 // 세무상담 신청 폼 — 이름, 연락처, 상담내용 (이메일 선택사항)
 import React, { useState } from "react";
+import { formatPhone, isValidPhone } from "@/lib/phone";
 
 type Status = "idle" | "submitting" | "success" | "error";
-
-const PHONE_RE = /^[0-9\-]{9,20}$/;
 
 export function TaxConsultForm() {
   const [form, setForm] = useState({
@@ -22,7 +21,7 @@ export function TaxConsultForm() {
 
   const validate = (): string | null => {
     if (form.name.trim().length < 2) return "이름을 2자 이상 입력해주세요.";
-    if (!PHONE_RE.test(form.phone.trim())) return "연락처 형식이 올바르지 않습니다.";
+    if (!isValidPhone(form.phone)) return "연락처 형식이 올바르지 않습니다. (예: 010-1234-5678)";
     if (form.content.trim().length < 10) return "상담 내용을 10자 이상 입력해주세요.";
     return null;
   };
@@ -86,7 +85,8 @@ export function TaxConsultForm() {
         <input
           type="tel"
           value={form.phone}
-          onChange={(e) => update("phone", e.target.value)}
+          onChange={(e) => update("phone", formatPhone(e.target.value))}
+          inputMode="tel"
           placeholder="010-1234-5678"
           className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         />

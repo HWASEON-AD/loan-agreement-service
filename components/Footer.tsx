@@ -30,7 +30,7 @@ export function Footer() {
           © {new Date().getFullYear()} {SERVICE_NAME}. All rights reserved. (HWASEONAD)
         </p>
         <p className="mt-1 text-xs text-slate-400">
-          대표자 : gt.min@hwaseon.com &nbsp;|&nbsp; 대표 : 민기태
+          대표 : 민기태 &nbsp;|&nbsp; 이메일 : gt.min@hwaseon.com
         </p>
       </div>
     </footer>

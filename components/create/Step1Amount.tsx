@@ -48,6 +48,16 @@ export function Step1Amount() {
   })();
   const canNext = amount >= 100000 && datesValid;
 
+  // 만기일 입력칸의 허용 범위 — 라벨의 "최대 5년"을 달력에서도 못 넘게 막는다.
+  //   (검증은 아래 handleNext 에도 그대로 남겨 둔다 — 붙여넣기 입력 대비)
+  const endBounds = (() => {
+    if (!form.startDate) return {};
+    const max = new Date(form.startDate);
+    max.setFullYear(max.getFullYear() + 5);
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    return { min: form.startDate, max: iso(max) };
+  })();
+
   // 다음 단계로
   const handleNext = () => {
     if (amount < 100000) {
@@ -136,6 +146,7 @@ export function Step1Amount() {
           <Input
             label="만기일 (최대 5년)"
             type="date"
+            {...endBounds}
             value={form.endDate}
             onChange={(e) => setForm({ ...form, endDate: e.target.value })}
           />

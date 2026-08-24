@@ -185,8 +185,9 @@ export function AdminTable() {
           </label>
           <input
             type="date"
+            min="1900-01-01"
             value={startDate}
-            max={endDate || undefined}
+            max={endDate || "2999-12-31"}
             onChange={(e) => setStartDate(e.target.value)}
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700"
           />
@@ -198,8 +199,9 @@ export function AdminTable() {
           </label>
           <input
             type="date"
+            max="2999-12-31"
             value={endDate}
-            min={startDate || undefined}
+            min={startDate || "1900-01-01"}
             onChange={(e) => setEndDate(e.target.value)}
             className="rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-700"
           />

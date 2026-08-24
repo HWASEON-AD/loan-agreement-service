@@ -29,6 +29,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
+import { formatPhone } from "@/lib/phone";
 import { LegalNotice } from "@/components/ui/LegalNotice";
 import { FormDocument } from "@/components/renewal/FormDocument";
 import {
@@ -562,7 +563,8 @@ export function RenewalForm() {
               <Input
                 label="임차인 연락처"
                 value={tenantPhone}
-                onChange={(e) => setTenantPhone(e.target.value)}
+                onChange={(e) => setTenantPhone(formatPhone(e.target.value))}
+                inputMode="tel"
                 placeholder="010-0000-0000"
               />
             </div>
@@ -603,7 +605,8 @@ export function RenewalForm() {
               <Input
                 label="임대인 연락처"
                 value={landlordPhone}
-                onChange={(e) => setLandlordPhone(e.target.value)}
+                onChange={(e) => setLandlordPhone(formatPhone(e.target.value))}
+                inputMode="tel"
                 placeholder="010-0000-0000"
               />
             </div>

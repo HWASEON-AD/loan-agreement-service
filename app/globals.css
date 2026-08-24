@@ -39,6 +39,30 @@ body {
   }
 }
 
+/* 날짜 입력이 화면 밖으로 삐져나가는 문제
+   — iOS 사파리는 <input type="date"> 를 내용 크기로 그려서 width:100% 를 무시한다.
+     그리드·플렉스 자식이면 min-width:auto 때문에 줄어들지도 못해 부모보다 넓어진다.
+     (html,body 에 overflow-x:hidden 이 걸려 있어 스크롤도 안 되고 그냥 잘려 보인다)
+   @supports (-webkit-touch-callout: none) 은 iOS 사파리에서만 참이라,
+   PC 크롬의 달력 아이콘 등 기본 UI 는 그대로 둔 채 iOS 만 교정한다. */
+@supports (-webkit-touch-callout: none) {
+  input[type="date"],
+  input[type="datetime-local"],
+  input[type="month"],
+  input[type="time"] {
+    -webkit-appearance: none;
+    appearance: none;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    /* iOS 는 값이 있으면 가운데 정렬로 그린다 — 다른 입력칸과 맞춘다 */
+    text-align: left;
+    /* 값이 비어 있을 때 높이가 0 이 되지 않게 */
+    min-height: 1.25rem;
+  }
+}
+
 /* 서명 캔버스 기본 스타일 */
 .sig-canvas {
   touch-action: none;

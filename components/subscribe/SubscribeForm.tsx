@@ -10,6 +10,7 @@ import { Card } from "@/components/ui/Card";
 import { Input } from "@/components/ui/Input";
 import { formatNumber } from "@/lib/interest-calc";
 import { SUBSCRIPTION_PRICE } from "@/lib/config";
+import { formatPhone } from "@/lib/phone";
 
 interface SubscribeFormProps {
   agreementId: string;
@@ -78,7 +79,8 @@ export function SubscribeForm({
           label="연락처"
           type="tel"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => setPhone(formatPhone(e.target.value))}
+          inputMode="tel"
           placeholder="010-1234-5678"
         />
 

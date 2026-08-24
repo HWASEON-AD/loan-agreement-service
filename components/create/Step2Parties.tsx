@@ -12,14 +12,7 @@ import { LegalNotice } from "@/components/ui/LegalNotice";
 import { loadForm, saveForm, defaultForm } from "@/lib/form-store";
 import { FAMILY_RELATION_LABELS } from "@/lib/types";
 import type { CreateFormData, FamilyRelation, Party } from "@/lib/types";
-
-// 휴대폰 번호 자동 하이픈 (010-1234-5678)
-function formatPhone(s: string): string {
-  const d = s.replace(/\D/g, "").slice(0, 11);
-  if (d.length < 4) return d;
-  if (d.length < 8) return `${d.slice(0, 3)}-${d.slice(3)}`;
-  return `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
-}
+import { formatPhone } from "@/lib/phone";
 
 // 당사자 입력 카드 (아코디언 헤더 + 펼침 영역)
 function PartyFields({
