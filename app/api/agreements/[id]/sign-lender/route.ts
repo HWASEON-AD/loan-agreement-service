@@ -14,6 +14,7 @@ export async function POST(
 ) {
   try {
     const body = (await req.json()) as {
+      token?: string;
       signatureImageBase64: string;
     };
 
@@ -22,6 +23,26 @@ export async function POST(
       return NextResponse.json(
         { error: "약정서를 찾을 수 없습니다." },
         { status: 404 }
+      );
+    }
+
+    // 재서명 방지 — 이미 대여자 서명/결제/완료된 약정서는 덮어쓰기 차단
+    if (
+      agreement.lenderSigned ||
+      agreement.status === "paid" ||
+      agreement.status === "completed"
+    ) {
+      return NextResponse.json(
+        { error: "이미 대여자 서명이 완료된 약정서입니다." },
+        { status: 400 }
+      );
+    }
+
+    // 토큰 검증 — 작성자(대여자) 토큰이 일치해야 서명 허용 (차용자 서명과 대칭)
+    if (!body.token || body.token !== agreement.lenderSignToken) {
+      return NextResponse.json(
+        { error: "유효하지 않은 서명 요청입니다." },
+        { status: 403 }
       );
     }
 

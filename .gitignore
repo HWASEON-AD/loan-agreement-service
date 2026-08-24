@@ -32,3 +32,6 @@ next-env.d.ts
 .vercel
 
 .vercel
+
+# 미커밋 작업 백업 (패치 파일 — 커밋 금지)
+/_wip_backup/

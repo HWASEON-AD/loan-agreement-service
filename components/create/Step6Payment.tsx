@@ -7,7 +7,7 @@ import { StepForm } from "@/components/StepForm";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 import { LegalNotice } from "@/components/ui/LegalNotice";
-import { loadAgreementId, clearForm } from "@/lib/form-store";
+import { loadAgreementId, loadLenderToken, clearForm } from "@/lib/form-store";
 import { SERVICE_PRICE, SERVICE_PRICE_ORIGINAL, PAYMENT_PRODUCT_NAME } from "@/lib/config";
 import { formatNumber } from "@/lib/interest-calc";
 
@@ -49,8 +49,14 @@ export function Step6Payment() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "결제 처리 실패");
       const completeId = agreementId;
+      const token = loadLenderToken();
       clearForm();
-      router.push(`/complete/${completeId}`);
+      // 완료화면이 본인 약정서에 접근할 수 있도록 토큰을 URL 로 전달
+      router.push(
+        token
+          ? `/complete/${completeId}?t=${encodeURIComponent(token)}`
+          : `/complete/${completeId}`
+      );
     } catch (e) {
       setError(e instanceof Error ? e.message : "결제 처리 중 오류가 발생했습니다.");
     } finally {

@@ -118,7 +118,12 @@ export async function POST(req: NextRequest) {
     };
     await saveOrder(order);
 
-    return NextResponse.json({ agreementId: agreement.id });
+    // 대여자(작성자) 접근 토큰을 함께 반환한다.
+    // 이후 완료화면/PDF/폴링 등에서 이 토큰으로 본인 약정서에만 접근하도록 게이팅한다.
+    return NextResponse.json({
+      agreementId: agreement.id,
+      lenderToken: agreement.lenderSignToken,
+    });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     console.error("[create] 약정서 생성 실패:", err);

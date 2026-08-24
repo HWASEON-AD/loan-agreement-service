@@ -68,6 +68,20 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+
+      // ★금액 위변조 방지: 클라이언트가 보낸 금액이 아니라 서버에 저장된 주문 금액을 신뢰한다.
+      // 클라이언트가 body.amount 를 함께 보낸 경우, 서버 주문 금액과 다르면 즉시 거부.
+      const serverAmount = order.amount;
+      if (body.amount !== undefined && body.amount !== serverAmount) {
+        console.error(
+          `[payment/confirm] 금액 불일치(위변조 의심): client=${body.amount} server=${serverAmount}`
+        );
+        return NextResponse.json(
+          { error: "결제 금액이 올바르지 않습니다." },
+          { status: 400 }
+        );
+      }
+
       const auth = Buffer.from(`${secretKey}:`).toString("base64");
       const res = await fetch(
         "https://api.tosspayments.com/v1/payments/confirm",
@@ -80,7 +94,7 @@ export async function POST(req: NextRequest) {
           body: JSON.stringify({
             paymentKey: body.paymentKey,
             orderId: body.orderId,
-            amount: body.amount ?? SERVICE_PRICE,
+            amount: serverAmount, // 서버 값으로 승인 (클라 값 신뢰 안 함)
           }),
         }
       );
@@ -90,6 +104,28 @@ export async function POST(req: NextRequest) {
         await updateOrder(order.id, { status: "failed" });
         return NextResponse.json(
           { error: "결제 승인에 실패했습니다." },
+          { status: 402 }
+        );
+      }
+
+      // ★승인 응답 재검증: 실제 승인된 금액/주문번호가 서버 기대값과 일치하는지 대조.
+      // (토스가 승인한 totalAmount 가 주문 금액과 다르면 위변조로 간주하고 실패 처리)
+      let approved: { totalAmount?: number; orderId?: string; status?: string } = {};
+      try {
+        approved = await res.json();
+      } catch {
+        approved = {};
+      }
+      if (
+        approved.totalAmount !== serverAmount ||
+        (approved.orderId && approved.orderId !== body.orderId)
+      ) {
+        console.error(
+          `[payment/confirm] 승인금액 불일치: approved=${approved.totalAmount} expected=${serverAmount}`
+        );
+        await updateOrder(order.id, { status: "failed" });
+        return NextResponse.json(
+          { error: "결제 금액 검증에 실패했습니다." },
           { status: 402 }
         );
       }

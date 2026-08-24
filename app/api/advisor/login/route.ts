@@ -6,9 +6,20 @@ import {
   expectedAdvisorSessionToken,
   ADVISOR_COOKIE,
 } from "@/lib/advisor-auth";
+import { rateLimit } from "@/lib/rate-limit";
+import { getClientIp } from "@/lib/request-info";
 
 export async function POST(req: NextRequest) {
   try {
+    // 브루트포스 차단: IP당 10분 10회
+    const rl = rateLimit(`advisor-login:${getClientIp(req)}`, 10, 10 * 60 * 1000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: `로그인 시도가 너무 많습니다. ${rl.retryAfter}초 후 다시 시도해주세요.` },
+        { status: 429 }
+      );
+    }
+
     const body = (await req.json()) as { password: string };
 
     if (!verifyAdvisorPassword(body.password)) {

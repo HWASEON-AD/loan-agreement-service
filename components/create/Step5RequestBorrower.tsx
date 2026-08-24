@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { StepForm } from "@/components/StepForm";
 import { Button } from "@/components/ui/Button";
 import { LegalNotice } from "@/components/ui/LegalNotice";
-import { loadAgreementId } from "@/lib/form-store";
+import { loadAgreementId, loadLenderToken } from "@/lib/form-store";
 
 export function Step5RequestBorrower() {
   const router = useRouter();
@@ -36,7 +36,11 @@ export function Step5RequestBorrower() {
     try {
       const res = await fetch(
         `/api/agreements/${agreementId}/request-borrower`,
-        { method: "POST" }
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: loadLenderToken() }),
+        }
       );
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "요청 발송 실패");

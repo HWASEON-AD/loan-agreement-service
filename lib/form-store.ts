@@ -5,6 +5,7 @@ import type { CreateFormData } from "./types";
 
 const KEY = "loan_create_form";
 const ID_KEY = "loan_agreement_id";
+const TOKEN_KEY = "loan_lender_token";
 
 // 기본 폼 값
 export function defaultForm(): CreateFormData {
@@ -57,9 +58,21 @@ export function loadAgreementId(): string | null {
   return sessionStorage.getItem(ID_KEY);
 }
 
+// 대여자(작성자) 접근 토큰 저장/로드
+export function saveLenderToken(token: string): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(TOKEN_KEY, token);
+}
+
+export function loadLenderToken(): string | null {
+  if (typeof window === "undefined") return null;
+  return sessionStorage.getItem(TOKEN_KEY);
+}
+
 // 작성 데이터 초기화
 export function clearForm(): void {
   if (typeof window === "undefined") return;
   sessionStorage.removeItem(KEY);
   sessionStorage.removeItem(ID_KEY);
+  sessionStorage.removeItem(TOKEN_KEY);
 }

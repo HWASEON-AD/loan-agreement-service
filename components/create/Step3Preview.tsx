@@ -6,7 +6,12 @@ import { useRouter } from "next/navigation";
 import { StepForm } from "@/components/StepForm";
 import { Button } from "@/components/ui/Button";
 import { AgreementPreview } from "@/components/AgreementPreview";
-import { loadForm, saveAgreementId, loadAgreementId } from "@/lib/form-store";
+import {
+  loadForm,
+  saveAgreementId,
+  loadAgreementId,
+  saveLenderToken,
+} from "@/lib/form-store";
 import type { CreateFormData } from "@/lib/types";
 
 export function Step3Preview() {
@@ -47,6 +52,7 @@ export function Step3Preview() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "약정서 생성 실패");
       saveAgreementId(data.agreementId);
+      if (data.lenderToken) saveLenderToken(data.lenderToken);
       router.push("/create/step/4");
     } catch (e) {
       setError(e instanceof Error ? e.message : "약정서 생성 중 오류가 발생했습니다.");

@@ -4,9 +4,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAgreement, updateAgreement } from "@/lib/db";
 import { sendBorrowerSignRequest } from "@/lib/email";
 import { getBaseUrl } from "@/lib/config";
+import { rateLimit } from "@/lib/rate-limit";
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
@@ -15,6 +16,33 @@ export async function POST(
       return NextResponse.json(
         { error: "약정서를 찾을 수 없습니다." },
         { status: 404 }
+      );
+    }
+
+    // 인증: 작성자(대여자) 토큰 필수 — 무인증 이메일 폭탄/토큰만료 연장 남용 차단
+    const { searchParams } = new URL(req.url);
+    let token = searchParams.get("token") || undefined;
+    if (!token) {
+      try {
+        const body = (await req.json()) as { token?: string };
+        token = body?.token;
+      } catch {
+        // 본문 없음 — 아래에서 토큰 부재로 처리
+      }
+    }
+    if (!token || token !== agreement.lenderSignToken) {
+      return NextResponse.json(
+        { error: "유효하지 않은 요청입니다." },
+        { status: 403 }
+      );
+    }
+
+    // 레이트리밋: 약정서당 1분 3회
+    const rl = rateLimit(`req-borrower:${agreement.id}`, 3, 60 * 1000);
+    if (!rl.ok) {
+      return NextResponse.json(
+        { error: `요청이 너무 잦습니다. ${rl.retryAfter}초 후 다시 시도해주세요.` },
+        { status: 429 }
       );
     }
 

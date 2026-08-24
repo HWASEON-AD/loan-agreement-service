@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/Button";
 import { OtpInput } from "@/components/OtpInput";
 import { SignatureStampField } from "@/components/SignatureStampField";
 import { LegalNotice } from "@/components/ui/LegalNotice";
-import { loadAgreementId } from "@/lib/form-store";
+import { loadAgreementId, loadLenderToken } from "@/lib/form-store";
 
 export function Step4LenderSign() {
   const router = useRouter();
@@ -38,7 +38,10 @@ export function Step4LenderSign() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ signatureImageBase64: signature }),
+          body: JSON.stringify({
+            token: loadLenderToken(),
+            signatureImageBase64: signature,
+          }),
         }
       );
       const data = await res.json();

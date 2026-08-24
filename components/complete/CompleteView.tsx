@@ -13,7 +13,13 @@ import { formatNumber } from "@/lib/interest-calc";
 import type { Agreement, Order } from "@/lib/types";
 import { trackPixelEvent } from "@/components/MetaPixel";
 
-export function CompleteView({ agreementId }: { agreementId: string }) {
+export function CompleteView({
+  agreementId,
+  token,
+}: {
+  agreementId: string;
+  token: string | null;
+}) {
   const [agreement, setAgreement] = useState<Agreement | null>(null);
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
@@ -21,9 +27,12 @@ export function CompleteView({ agreementId }: { agreementId: string }) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/api/agreements/${agreementId}`, {
-          cache: "no-store",
-        });
+        const res = await fetch(
+          `/api/agreements/${agreementId}${
+            token ? `?token=${encodeURIComponent(token)}` : ""
+          }`,
+          { cache: "no-store" }
+        );
         const data = await res.json();
         if (res.ok) {
           setAgreement(data.agreement);
@@ -97,9 +106,9 @@ export function CompleteView({ agreementId }: { agreementId: string }) {
           )}
 
           {/* PDF 다운로드 — 토큰 필수 (보안 접근 제어) */}
-          {agreement?.lenderSignToken ? (
+          {token ? (
             <a
-              href={`/api/agreements/${agreementId}/pdf?token=${agreement.lenderSignToken}`}
+              href={`/api/agreements/${agreementId}/pdf?token=${encodeURIComponent(token)}`}
               target="_blank"
               rel="noreferrer"
             >
@@ -112,9 +121,9 @@ export function CompleteView({ agreementId }: { agreementId: string }) {
           )}
 
           {/* 감사추적인증서 다운로드 */}
-          {agreement?.lenderSignToken ? (
+          {token ? (
             <a
-              href={`/api/agreements/${agreementId}/audit-cert?token=${agreement.lenderSignToken}`}
+              href={`/api/agreements/${agreementId}/audit-cert?token=${encodeURIComponent(token)}`}
               target="_blank"
               rel="noreferrer"
             >
@@ -156,11 +165,8 @@ export function CompleteView({ agreementId }: { agreementId: string }) {
           </Card>
 
           {/* 이체 확인증 업로드 — 토큰 필수 */}
-          {agreement?.lenderSignToken ? (
-            <TransferEvidenceSection
-              agreementId={agreementId}
-              token={agreement.lenderSignToken}
-            />
+          {token ? (
+            <TransferEvidenceSection agreementId={agreementId} token={token} />
           ) : null}
 
           {/* 이자 리마인더 구독 CTA */}
@@ -172,10 +178,9 @@ export function CompleteView({ agreementId }: { agreementId: string }) {
               납부일 알림과 입금 기록 관리를 도와드립니다. 월{" "}
               {formatNumber(SUBSCRIPTION_PRICE)}원.
             </p>
-            {agreement?.lenderSignToken &&
-            agreement.interestRate > 0 ? (
+            {token && agreement && agreement.interestRate > 0 ? (
               <Link
-                href={`/subscribe/${agreementId}?token=${agreement.lenderSignToken}`}
+                href={`/subscribe/${agreementId}?token=${encodeURIComponent(token)}`}
                 className="mt-3 inline-block"
               >
                 <Button variant="outline">이자 관리 구독 신청하기</Button>
