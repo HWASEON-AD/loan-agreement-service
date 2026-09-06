@@ -32,3 +32,6 @@ next-env.d.ts
 .vercel
 
 .vercel
+
+# 로컬 백업 (2026-09-06)
+_wip_backup/
